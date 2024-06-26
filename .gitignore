@@ -1,0 +1,5 @@
+datasets/
+result/
+vilt/bert-base/pytorch_model.bin
+vilt/vilt_200k_mlm_itm.ckpt
+*.ckpt
