@@ -8,6 +8,7 @@ from vilt.modules import heads, objectives, vilt_utils
 import ipdb
 
 
+
 class ViLTransformerSS(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
@@ -200,21 +201,34 @@ class ViLTransformerSS(pl.LightningModule):
             missing_img_prompt
         )
 
-        kro_prompt_A_com = torch.zeros(prompt_num, 2, 2)
-        kro_prompt_A_com[:, 0, 0].fill_(1)
         kro_prompt_A_t = torch.zeros(prompt_num, 2, 2)
         kro_prompt_A_t[:, 0, 1].fill_(1)
+        kro_prompt_A_t[:, 1, 0].fill_(1)
         kro_prompt_A_i = torch.zeros(prompt_num, 2, 2)
         kro_prompt_A_i[:, 1, 0].fill_(1)
+        kro_prompt_A_i[:, 0, 1].fill_(1)
+        kro_prompt_A_com = kro_prompt_A_i + kro_prompt_A_t
 
-        kro_prompt_B = torch.randn(prompt_num, int(prompt_length / 2), 2)
-        kro_prompt_C = torch.randn(prompt_num, 2, int(embed_dim / 2))
+        kro_prompt_B1 = torch.randn(prompt_num, int(prompt_length / 2), 3)
+        kro_prompt_B2 = torch.randn(prompt_num, int(prompt_length / 2), 3)
+        kro_prompt_B3 = torch.randn(prompt_num, int(prompt_length / 2), 3)
+        kro_prompt_B4 = torch.randn(prompt_num, int(prompt_length / 2), 3)
+        kro_prompt_C1 = torch.randn(prompt_num, 3, int(embed_dim / 2))
+        kro_prompt_C2 = torch.randn(prompt_num, 3, int(embed_dim / 2))
+        kro_prompt_C3 = torch.randn(prompt_num, 3, int(embed_dim / 2))
+        kro_prompt_C4 = torch.randn(prompt_num, 3, int(embed_dim / 2))
 
         self.kro_prompt_A_com = nn.Parameter(kro_prompt_A_com)
         self.kro_prompt_A_t = nn.Parameter(kro_prompt_A_t)
         self.kro_prompt_A_i = nn.Parameter(kro_prompt_A_i)
-        self.kro_prompt_B = nn.Parameter(kro_prompt_B)
-        self.kro_prompt_C = nn.Parameter(kro_prompt_C)
+        self.kro_prompt_B1 = nn.Parameter(kro_prompt_B1)
+        self.kro_prompt_B2 = nn.Parameter(kro_prompt_B2)
+        self.kro_prompt_B3 = nn.Parameter(kro_prompt_B3)
+        self.kro_prompt_B4 = nn.Parameter(kro_prompt_B4)
+        self.kro_prompt_C1 = nn.Parameter(kro_prompt_C1)
+        self.kro_prompt_C2 = nn.Parameter(kro_prompt_C2)
+        self.kro_prompt_C3 = nn.Parameter(kro_prompt_C3)
+        self.kro_prompt_C4 = nn.Parameter(kro_prompt_C4)
 
         if not self.learnt_p:
             self.complete_prompt.requires_grad = False
@@ -223,8 +237,14 @@ class ViLTransformerSS(pl.LightningModule):
             self.kro_prompt_A_com.requires_grad = False
             self.kro_prompt_A_i.requires_grad = False
             self.kro_prompt_A_t.requires_grad = False
-            self.kro_prompt_B.requires_grad = False
-            self.kro_prompt_C.requires_grad = False
+            self.kro_prompt_B1.requires_grad = False
+            self.kro_prompt_B2.requires_grad = False
+            self.kro_prompt_B3.requires_grad = False
+            self.kro_prompt_B4.requires_grad = False
+            self.kro_prompt_C1.requires_grad = False
+            self.kro_prompt_C2.requires_grad = False
+            self.kro_prompt_C3.requires_grad = False
+            self.kro_prompt_C4.requires_grad = False
 
         for param in self.transformer.parameters():
             param.requires_grad = False
@@ -243,6 +263,9 @@ class ViLTransformerSS(pl.LightningModule):
             state_dict = ckpt["state_dict"]
             self.load_state_dict(state_dict, strict=False)
         self.records = {}
+
+
+
 
     def infer(
         self,
@@ -302,36 +325,43 @@ class ViLTransformerSS(pl.LightningModule):
         # instance wise missing aware prompts
         prompts = None
 
+        def modified_kronecker_product(A, B1, B2, B3, B4, C1, C2, C3, C4):
+            modified_Block1 = A[0, 0, 0] * (B1 @ C1)
+            modified_Block2 = A[0, 0, 1] * (B2 @ C2)
+            modified_Block3 = A[0, 1, 0] * (B3 @ C3)
+            modified_Block4 = A[0, 1, 1] * (B4 @ C4)
+            cat_1 = torch.cat([modified_Block1, modified_Block2], dim=2)
+            cat_2 = torch.cat([modified_Block3, modified_Block4], dim=2)
+            res = torch.cat([cat_1, cat_2], dim=1)
+            return res
+
         if self.prompt_type == "kronecker":
 
             for idx in range(len(img)):
                 if batch["missing_type"][idx] == 0:
-                    D = self.kro_prompt_B @ self.kro_prompt_C
-                    prompt = torch.einsum(
-                        "bac,bkp->bakcp", self.kro_prompt_A_com, D
-                    ).view(
-                        self.kro_prompt_A_com.size(0),
-                        self.kro_prompt_A_com.size(1) * D.size(1),
-                        self.kro_prompt_A_com.size(2) * D.size(2),
-                    )
+                    prompt = modified_kronecker_product(
+                        self.kro_prompt_A_com, 
+                        self.kro_prompt_B1, self.kro_prompt_B2,
+                        self.kro_prompt_B3, self.kro_prompt_B4,
+                        self.kro_prompt_C1, self.kro_prompt_C2,
+                        self.kro_prompt_C3, self.kro_prompt_C4
+                        )
                 elif batch["missing_type"][idx] == 1:
-                    D = self.kro_prompt_B @ self.kro_prompt_C
-                    prompt = torch.einsum(
-                        "bac,bkp->bakcp", self.kro_prompt_A_t, D
-                    ).view(
-                        self.kro_prompt_A_t.size(0),
-                        self.kro_prompt_A_t.size(1) * D.size(1),
-                        self.kro_prompt_A_t.size(2) * D.size(2),
-                    )
+                    prompt = modified_kronecker_product(
+                        self.kro_prompt_A_t, 
+                        self.kro_prompt_B1, self.kro_prompt_B2,
+                        self.kro_prompt_B3, self.kro_prompt_B4,
+                        self.kro_prompt_C1, self.kro_prompt_C2,
+                        self.kro_prompt_C3, self.kro_prompt_C4
+                        )
                 elif batch["missing_type"][idx] == 2:
-                    D = self.kro_prompt_B @ self.kro_prompt_C
-                    prompt = torch.einsum(
-                        "bac,bkp->bakcp", self.kro_prompt_A_i, D
-                    ).view(
-                        self.kro_prompt_A_i.size(0),
-                        self.kro_prompt_A_i.size(1) * D.size(1),
-                        self.kro_prompt_A_i.size(2) * D.size(2),
-                    )
+                    prompt = modified_kronecker_product(
+                        self.kro_prompt_A_i, 
+                        self.kro_prompt_B1, self.kro_prompt_B2,
+                        self.kro_prompt_B3, self.kro_prompt_B4,
+                        self.kro_prompt_C1, self.kro_prompt_C2,
+                        self.kro_prompt_C3, self.kro_prompt_C4
+                        )
 
                 if prompt.size(0) != 1:
                     prompt = prompt.unsqueeze(0)
@@ -528,3 +558,5 @@ class ViLTransformerSS(pl.LightningModule):
 
     def configure_optimizers(self):
         return vilt_utils.set_schedule(self)
+    
+
