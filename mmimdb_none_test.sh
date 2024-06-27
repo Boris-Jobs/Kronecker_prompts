@@ -14,7 +14,7 @@ srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
      task_finetune_mmimdb \
      none_prompts \
      step50k \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/imdb_train_seed0_from_vilt_200k_mlm_itm/version_2/checkpoints/last.ckpt  \
+     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/imdb_none_train_seed0_from_vilt_200k_mlm_itm/version_0/checkpoints/last.ckpt  \
      exp_name=imdb_none_test  \
      test_ratio=0.2 \
      test_type=full  \
