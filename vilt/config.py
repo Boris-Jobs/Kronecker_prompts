@@ -9,9 +9,6 @@ def _loss_names(d):  # _ indicates it is not a part of public API.
         "mlm": 0,
         "mpp": 0,
         "mppd": 0,
-        "vqa": 0,
-        "nlvr2": 0,
-        "irtr": 0,
         "mmimdb": 0,
         "hatememes": 0,
         "food101": 0,
@@ -37,7 +34,7 @@ def config():
     fix_model = True
 
     # missing modality config
-    missing_ratio = {"train": 0.7, "val": 0.7, "test": 0.7}
+    missing_ratio = {"train": 0.1, "val": 0.1, "test": 0.1}
     missing_type = {
         "train": "both",
         "val": "both",
@@ -120,7 +117,6 @@ def task_finetune_mmimdb():
     exp_name = "finetune_mmimdb"
     datasets = ["mmimdb"]
     loss_names = _loss_names({"mmimdb": 1})
-    #     loss_names = _loss_names({"mmimdb": 1, "prompt": -0.5})
     batch_size = 256
     max_epoch = 10
     max_steps = None
@@ -129,39 +125,27 @@ def task_finetune_mmimdb():
     learning_rate = 1e-2
     val_check_interval = 0.2
     weight_decay = 2e-2
-    #     optim_type = "adam"
     max_text_len = 1024
 
-
-# Named configs for "environment" which define gpus and nodes, and paths
 @ex.named_config
-def env_dandelin():
-    data_root = "/data2/dsets/dataset"
-    log_dir = "/data2/vilt/result"
-    num_gpus = 8
-    num_nodes = 1
-
-
-# Named configs for "task" which define datasets, loss_names and desired batch_size, warmup_steps, epochs, and exp_name
-@ex.named_config
-def task_mlm_itm():
-    exp_name = "mlm_itm"
-    datasets = ["coco", "vg", "sbu", "gcc"]
-    loss_names = _loss_names({"itm": 1, "mlm": 1})
-    batch_size = 4096
-    max_epoch = 10
-    max_image_len = 200
-
+def kronecker_prompts():
+    prompt_type = "kronecker"
+    learnt_p = True
+    prompt_layers = [0, 1, 2, 3, 4, 5]
+    multi_layer_prompt = True
 
 @ex.named_config
-def task_mlm_itm_mpp():
-    exp_name = "mlm_itm_mpp"
-    datasets = ["coco", "vg", "sbu", "gcc"]
-    loss_names = _loss_names({"itm": 1, "mlm": 1, "mpp": 1})
-    batch_size = 4096
-    max_epoch = 10
-    max_image_len = 200
+def input_prompts():
+    prompt_type = "input"
+    learnt_p = True
+    prompt_layers = [0, 1, 2, 3, 4, 5]
+    multi_layer_prompt = True   
 
+@ex.named_config
+def none_prompts():
+    prompt_type = "none"
+    learnt_p = False
+    multi_layer_prompt = False   
 
 @ex.named_config
 def task_finetune_hatememes():
@@ -176,7 +160,6 @@ def task_finetune_hatememes():
     learning_rate = 1e-2
     val_check_interval = 0.11
     weight_decay = 2e-2
-    #     optim_type = "adam"
     max_text_len = 128
 
 
@@ -193,7 +176,6 @@ def task_finetune_food101():
     learning_rate = 1e-2
     val_check_interval = 0.2
     weight_decay = 2e-2
-    #     optim_type = "adam"
     max_text_len = 512
 
 
@@ -231,3 +213,36 @@ def vit32_base():
     hidden_size = 768
     num_heads = 12
     num_layers = 12
+
+
+# Named configs for "environment" which define gpus and nodes, and paths
+@ex.named_config
+def env_dandelin():
+    data_root = "/data2/dsets/dataset"
+    log_dir = "/data2/vilt/result"
+    num_gpus = 8
+    num_nodes = 1
+
+
+# Named configs for "task" which define datasets, loss_names and desired batch_size, warmup_steps, epochs, and exp_name
+@ex.named_config
+def task_mlm_itm():
+    exp_name = "mlm_itm"
+    datasets = ["coco", "vg", "sbu", "gcc"]
+    loss_names = _loss_names({"itm": 1, "mlm": 1})
+    batch_size = 4096
+    max_epoch = 10
+    max_image_len = 200
+
+
+@ex.named_config
+def task_mlm_itm_mpp():
+    exp_name = "mlm_itm_mpp"
+    datasets = ["coco", "vg", "sbu", "gcc"]
+    loss_names = _loss_names({"itm": 1, "mlm": 1, "mpp": 1})
+    batch_size = 4096
+    max_epoch = 10
+    max_image_len = 200
+
+
+

@@ -323,7 +323,6 @@ class Attention(nn.Module):
         """
 
         B, N, C = x.shape  # 批量大小、序列长度、特征维度
-        print("feature.shape: ", x.shape)
         if prompts is None or prompt_type == "input" or prompt_type == "kronecker":
             # origin attention
             qkv = (
@@ -339,10 +338,7 @@ class Attention(nn.Module):
                 qkv[2],
             )  # make torchscript happy (cannot use tensor as tuple)
             start_pos = mask.size(1) - N
-            print("N and start_pos: ", N, start_pos)
-            print("previous mask.shape: ", mask.shape)
             mask = mask[:, start_pos:]
-            print("mask.size: ", mask.shape)
 
         elif prompt_type == "attention":
             # prefix prompt tuning
@@ -368,7 +364,6 @@ class Attention(nn.Module):
             )
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
-        print("attn.size: ", attn.shape)
         if mask is not None:
             mask = mask.bool()
             attn = attn.masked_fill(~mask[:, None, None, :], float("-inf"))

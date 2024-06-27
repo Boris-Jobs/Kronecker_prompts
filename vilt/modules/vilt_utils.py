@@ -24,10 +24,7 @@ def set_metrics(pl_module):
         for k, v in pl_module.hparams.config["loss_names"].items():
             if v < 1:
                 continue
-            if k == "vqa":
-                setattr(pl_module, f"{split}_vqa_score", VQAScore())
-                setattr(pl_module, f"{split}_{k}_loss", Scalar())
-            elif k == "mmimdb":
+            if k == "mmimdb":
                 setattr(pl_module, f"{split}_{k}_F1_scores", F1_Score())
                 setattr(pl_module, f"{split}_{k}_loss", Scalar())
 
@@ -39,18 +36,6 @@ def set_metrics(pl_module):
             elif k == "food101":
                 setattr(pl_module, f"{split}_{k}_accuracy", Accuracy())
                 setattr(pl_module, f"{split}_{k}_loss", Scalar())
-
-            elif k == "nlvr2":
-                if split == "train":
-                    setattr(pl_module, f"train_{k}_accuracy", Accuracy())
-                    setattr(pl_module, f"train_{k}_loss", Scalar())
-                else:
-                    setattr(pl_module, f"dev_{k}_accuracy", Accuracy())
-                    setattr(pl_module, f"dev_{k}_loss", Scalar())
-                    setattr(pl_module, f"test_{k}_accuracy", Accuracy())
-                    setattr(pl_module, f"test_{k}_loss", Scalar())
-            elif k == "irtr":
-                setattr(pl_module, f"{split}_irtr_loss", Scalar())
             elif k == "mppd" or k == "mpfr":
                 setattr(pl_module, f"{split}_{k}_loss", Scalar())
             elif k == "itm":
@@ -104,7 +89,6 @@ def epoch_wrapup(pl_module):
             continue
 
         value = 0
-        print("####### epoch_wrapup for loop #######")
         if loss_name == "vqa":
             value = getattr(pl_module, f"{phase}_{loss_name}_score").compute()
             pl_module.log(f"{loss_name}/{phase}/score_epoch", value)
@@ -150,7 +134,6 @@ def epoch_wrapup(pl_module):
                 test_ablation(pl_module, loss_name, res)
 
         elif loss_name == "mmimdb":
-            print("#### load the F1 score of mmimdb ####")
             values = getattr(pl_module, f"{phase}_{loss_name}_F1_scores").compute()
             value = values[1]
             pl_module.log(f"{loss_name}/{phase}/F1_Micro_epoch", values[0])
@@ -171,40 +154,6 @@ def epoch_wrapup(pl_module):
                 )
                 test_ablation(pl_module, loss_name, res)
 
-        elif loss_name == "nlvr2":
-            if phase == "train":
-                value = getattr(pl_module, f"train_{loss_name}_accuracy").compute()
-                pl_module.log(f"{loss_name}/train/accuracy_epoch", value)
-                getattr(pl_module, f"train_{loss_name}_accuracy").reset()
-                pl_module.log(
-                    f"{loss_name}/train/loss_epoch",
-                    getattr(pl_module, f"train_{loss_name}_loss").compute(),
-                )
-                getattr(pl_module, f"train_{loss_name}_loss").reset()
-            else:
-                value = getattr(pl_module, f"dev_{loss_name}_accuracy").compute()
-                pl_module.log(f"{loss_name}/dev/accuracy_epoch", value)
-                getattr(pl_module, f"dev_{loss_name}_accuracy").reset()
-                pl_module.log(
-                    f"{loss_name}/dev/loss_epoch",
-                    getattr(pl_module, f"dev_{loss_name}_loss").compute(),
-                )
-                getattr(pl_module, f"dev_{loss_name}_loss").reset()
-
-                value = getattr(pl_module, f"test_{loss_name}_accuracy").compute()
-                pl_module.log(f"{loss_name}/test/accuracy_epoch", value)
-                getattr(pl_module, f"test_{loss_name}_accuracy").reset()
-                pl_module.log(
-                    f"{loss_name}/test/loss_epoch",
-                    getattr(pl_module, f"test_{loss_name}_loss").compute(),
-                )
-                getattr(pl_module, f"test_{loss_name}_loss").reset()
-        elif loss_name == "irtr":
-            pl_module.log(
-                f"{loss_name}/{phase}/irtr_loss_epoch",
-                getattr(pl_module, f"{phase}_irtr_loss").compute(),
-            )
-            getattr(pl_module, f"{phase}_irtr_loss").reset()
         elif loss_name == "mppd" or loss_name == "mpfr":
             pl_module.log(
                 f"{loss_name}/{phase}/loss_epoch",

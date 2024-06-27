@@ -73,7 +73,6 @@ class ViLTransformerSS(pl.LightningModule):
             self.transformer = getattr(vit, self.hparams.config["vit"])(
                 pretrained=False, config=self.hparams.config
             )
-        # getattr即前往vit获取 @register_model def vit_large_patch32_384(pretrained=False, **kwargs):
 
         self.pooler = heads.Pooler(config["hidden_size"])
         self.pooler.apply(objectives.init_weights)  # 把初始化应用到所有子模块
@@ -155,8 +154,6 @@ class ViLTransformerSS(pl.LightningModule):
             state_dict = ckpt["state_dict"]
             self.load_state_dict(state_dict, strict=False)
 
-        # pdb.set_trace()
-        # 读取prompts的具体参数
         self.prompt_type = self.hparams.config["prompt_type"]
         prompt_length = self.hparams.config["prompt_length"]
         self.prompt_length = prompt_length
@@ -165,49 +162,44 @@ class ViLTransformerSS(pl.LightningModule):
         self.prompt_layers = self.hparams.config["prompt_layers"]
         self.multi_layer_prompt = self.hparams.config["multi_layer_prompt"]
         prompt_num = len(self.prompt_layers) if self.multi_layer_prompt else 1
-        # 若添加6个prompt，那么prompt_num即为6
 
-        # 导入截断正态分布初始化函数
         from timm.models.layers import trunc_normal_
 
-        # 创建并初始化 complete_prompt 矩阵
+        # ===================== Initializing prompts ===================== #
         complete_prompt = torch.zeros(prompt_num, prompt_length, embed_dim)
-        complete_prompt[:, 0:1, :].fill_(1)  # 将矩阵中第1列填充为1
+        complete_prompt[:, 0:1, :].fill_(1)
         if self.learnt_p and self.prompt_type == "attention":
             complete_prompt[:, prompt_length // 2 : prompt_length // 2 + 1, :].fill_(
                 1
-            )  # 如果需要学习提示，并且提示类型是attention，将中间列填充为1
+            )
         self.complete_prompt = nn.Parameter(
             complete_prompt
-        )  # 将矩阵设置为模型的可训练参数
+        )
 
-        # 创建并初始化 missing_text_prompt 矩阵
         missing_text_prompt = torch.zeros(prompt_num, prompt_length, embed_dim)
-        missing_text_prompt[:, 2:3, :].fill_(1)  # 将矩阵中第3列填充为1
+        missing_text_prompt[:, 2:3, :].fill_(1)
         if self.learnt_p and self.prompt_type == "attention":
             missing_text_prompt[
                 :, prompt_length // 2 + 2 : prompt_length // 2 + 3, :
             ].fill_(
                 1
-            )  # 如果需要学习提示，并且提示类型是attention，将中间后两列填充为1
+            )
         self.missing_text_prompt = nn.Parameter(
             missing_text_prompt
-        )  # 将矩阵设置为模型的可训练参数
+        )
 
-        # 创建并初始化 missing_img_prompt 矩阵
         missing_img_prompt = torch.zeros(prompt_num, prompt_length, embed_dim)
-        missing_img_prompt[:, 1:2, :].fill_(1)  # 将矩阵中第2列填充为1
+        missing_img_prompt[:, 1:2, :].fill_(1)
         if self.learnt_p and self.prompt_type == "attention":
             missing_img_prompt[
                 :, prompt_length // 2 + 1 : prompt_length // 2 + 2, :
             ].fill_(
                 1
-            )  # 如果需要学习提示，并且提示类型是attention，将中间后一列填充为1
+            )
         self.missing_img_prompt = nn.Parameter(
             missing_img_prompt
-        )  # 将矩阵设置为模型的可训练参数
+        )
 
-        # Kronecker_prompt矩阵初始化
         kro_prompt_A_com = torch.zeros(prompt_num, 2, 2)
         kro_prompt_A_com[:, 0, 0].fill_(1)
         kro_prompt_A_t = torch.zeros(prompt_num, 2, 2)
@@ -218,14 +210,12 @@ class ViLTransformerSS(pl.LightningModule):
         kro_prompt_B = torch.randn(prompt_num, int(prompt_length / 2), 2)
         kro_prompt_C = torch.randn(prompt_num, 2, int(embed_dim / 2))
 
-        # Kronecker_prompt矩阵
         self.kro_prompt_A_com = nn.Parameter(kro_prompt_A_com)
         self.kro_prompt_A_t = nn.Parameter(kro_prompt_A_t)
         self.kro_prompt_A_i = nn.Parameter(kro_prompt_A_i)
         self.kro_prompt_B = nn.Parameter(kro_prompt_B)
         self.kro_prompt_C = nn.Parameter(kro_prompt_C)
 
-        # 如果不学习提示（learnt_p 为 False），则设置提示参数为不可训练
         if not self.learnt_p:
             self.complete_prompt.requires_grad = False
             self.missing_text_prompt.requires_grad = False
@@ -294,13 +284,6 @@ class ViLTransformerSS(pl.LightningModule):
                 mask_it=mask_image,
             )
 
-        # deal with zero input images
-
-        # for idx in range(len(img)):
-        #   if len(torch.unique(img[idx])) <= 2:
-        #       image_embeds[idx,1:].fill_(0)
-        #       image_masks[idx,1:].fill_(0)
-        #       image_embeds[idx,1:].fill_(1)
 
         else:
             patch_index, image_labels = (
@@ -378,6 +361,9 @@ class ViLTransformerSS(pl.LightningModule):
                 else:
                     prompts = torch.cat([prompts, prompt], dim=0)
                 # 将样本的prompt合并成为prompts张量
+        elif self.prompt_type == "none":
+            prompt = None
+            prompts = None
 
         # 初始化不同的masks
         if self.learnt_p:
@@ -408,42 +394,36 @@ class ViLTransformerSS(pl.LightningModule):
         # input 提示类型：掩码长度为 self.prompt_length * len(self.prompt_layers)
         # 如果不学习提示，掩码长度为 self.prompt_length
 
-        # 合并提示掩码、文本掩码、图像掩码
         if prompts == None:
             co_masks = torch.cat([text_masks, image_masks], dim=1)
-            print("co_mask.size: ", co_masks.shape)
         else:
             co_masks = torch.cat([prompt_masks, text_masks, image_masks], dim=1)
-            print("co_mask.size: ", co_masks.shape)
-        # 合并文本和图像的embeddings
         co_embeds = torch.cat([text_embeds, image_embeds], dim=1)
         x = co_embeds.detach()
-        # 将提示掩码、文本掩码和图像掩码合并在一起；同样地，将文本和图像的嵌入合并在一起
 
-        for i, blk in enumerate(self.transformer.blocks):
-            print("i, blk: ", i, blk)
-            print("co_masks.shape before blk: ", co_masks.shape)
-            if i in self.prompt_layers:
-                if (
-                    self.multi_layer_prompt
-                ):  # a flag indicating whether to use multiple prompts per layer or a single prompt for all layers
-                    x, _attn = blk(
-                        x,
-                        mask=co_masks,
-                        prompts=prompts[:, self.prompt_layers.index(i)],
-                        learnt_p=self.learnt_p,
-                        prompt_type=self.prompt_type,
-                    )
-
+        if self.prompt_type == "none":
+            for i, blk in enumerate(self.transformer.blocks):
+                    x, _attn = blk(x, mask=co_masks)
+        else:
+            for i, blk in enumerate(self.transformer.blocks):
+                if i in self.prompt_layers:
+                    if (
+                        self.multi_layer_prompt
+                    ):  # a flag indicating whether to use multiple prompts per layer or a single prompt for all layers
+                        x, _attn = blk(
+                            x,
+                            mask=co_masks,
+                            prompts=prompts[:, self.prompt_layers.index(i)],
+                            learnt_p=self.learnt_p,
+                            prompt_type=self.prompt_type,
+                        )
+                    else:
+                        x, _attn = blk(
+                            x, mask=co_masks, prompts=prompts, learnt_p=self.learnt_p
+                        )
                 else:
-                    x, _attn = blk(
-                        x, mask=co_masks, prompts=prompts, learnt_p=self.learnt_p
-                    )
-            else:
-                x, _attn = blk(x, mask=co_masks)
-            print("co_mask.size after blk: ", co_masks.shape)
+                    x, _attn = blk(x, mask=co_masks)            
 
-        # 对于每一个 transformer 层，如果当前层在 self.prompt_layers 中，则应用提示
 
         x = self.transformer.norm(x)  # 输出归一化
 
@@ -465,7 +445,6 @@ class ViLTransformerSS(pl.LightningModule):
             or self.prompt_type == "none"
         ):
             cls_feats = self.pooler(x[:, total_prompt_len : total_prompt_len + 1])
-        # cls_feats = self.pooler(x[:,:prompts.size(1)].mean(dim=1,keepdim=True))
         elif self.prompt_type == "attention":
             cls_feats = self.pooler(x)
 
@@ -533,10 +512,6 @@ class ViLTransformerSS(pl.LightningModule):
 
     def validation_epoch_end(self, outs):
         vilt_utils.epoch_wrapup(self)
-
-    # print('missing_img:', self.missing_img_prompt[0,0:3,0:8])
-    # print('missing_text:', self.missing_text_prompt[0,0:3,0:8])
-    # print('complete:', self.complete_prompt[0,0:3,0:8])
 
     def test_step(self, batch, batch_idx):
 
