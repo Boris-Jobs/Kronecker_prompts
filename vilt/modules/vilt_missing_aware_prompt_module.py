@@ -205,8 +205,8 @@ class ViLTransformerSS(pl.LightningModule):
         kro_prompt_A_t[:, 0, 1].fill_(1)
         kro_prompt_A_t[:, 1, 0].fill_(1)
         kro_prompt_A_i = torch.zeros(prompt_num, 2, 2)
-        kro_prompt_A_i[:, 1, 0].fill_(1)
-        kro_prompt_A_i[:, 0, 1].fill_(1)
+        kro_prompt_A_i[:, 0, 0].fill_(1)
+        kro_prompt_A_i[:, 1, 1].fill_(1)
         kro_prompt_A_com = kro_prompt_A_i + kro_prompt_A_t
 
         kro_prompt_B1 = torch.randn(prompt_num, int(prompt_length / 2), 3)
@@ -263,6 +263,7 @@ class ViLTransformerSS(pl.LightningModule):
             state_dict = ckpt["state_dict"]
             self.load_state_dict(state_dict, strict=False)
         self.records = {}
+
 
 
 
