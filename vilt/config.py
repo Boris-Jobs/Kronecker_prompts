@@ -26,8 +26,8 @@ def config():
     batch_size = 256  # this is a desired batch size; pl trainer will accumulate gradients when per step batch is smaller.
 
     # eval config (for bash execution)
-    test_ratio = None
-    test_type = None
+    test_ratio = 0.5
+    test_type = "both"
     test_exp_name = None
 
     # fix backbone model (ViLT) weights
@@ -36,13 +36,14 @@ def config():
     # missing modality config
     missing_ratio = {"train": 0.5, "val": 0.5, "test": 0.5}
     missing_type = {
-        "train": "image",
+        "train": "both",
         "val": "both",
-        "test": "image",
+        "test": "both",
     }  # ['text', 'image', 'both'] in VL tasks
     both_ratio = 0.5  # missing both ratio
     missing_table_root = "./datasets/missing_tables/"
-    simulate_missing = False
+    simulate_missing = True
+    with_delta_infer = None
 
     # missing_aware_prompts config
     prompt_type = "kronecker"
@@ -82,8 +83,7 @@ def config():
     learning_rate = 1e-4
     weight_decay = 0.01
     decay_power = 1
-    max_epoch = 25
-    max_steps = 25000
+    max_epoch = 20
     warmup_steps = 2500
     end_lr = 0
     lr_mult = 1  # multiply lr for downstream heads
@@ -104,7 +104,7 @@ def config():
     # below params varies with the environment
     data_root = ""
     log_dir = "result"
-    per_gpu_batchsize = 0  # you should define this manually with per_gpu_batch_size=#
+    per_gpu_batchsize = 16  # you should define this manually with per_gpu_batch_size=#
     num_gpus = 1
     num_nodes = 1
     load_path = ""
@@ -118,8 +118,7 @@ def task_finetune_mmimdb():
     datasets = ["mmimdb"]
     loss_names = _loss_names({"mmimdb": 1})
     batch_size = 256
-    max_epoch = 25
-    max_steps = None
+    max_epoch = 20
     warmup_steps = 0.1
     draw_false_image = 0
     learning_rate = 1e-2
@@ -153,8 +152,7 @@ def task_finetune_hatememes():
     datasets = ["Hatefull_Memes"]
     loss_names = _loss_names({"hatememes": 1})
     batch_size = 256
-    max_epoch = 25
-    max_steps = None
+    max_epoch = 20
     warmup_steps = 0.1
     draw_false_image = 0
     learning_rate = 1e-2
@@ -169,8 +167,7 @@ def task_finetune_food101():
     datasets = ["Food101"]
     loss_names = _loss_names({"food101": 1})
     batch_size = 256
-    max_epoch = 25
-    max_steps = None
+    max_epoch = 20
     warmup_steps = 0.1
     draw_false_image = 0
     learning_rate = 1e-2
@@ -184,26 +181,11 @@ def task_finetune_food101():
 
 @ex.named_config
 def step25k():
-    max_epoch = 25
-    max_steps = 25000
-
+    max_epoch = 20
 
 @ex.named_config
 def step50k():
-    max_epoch = 25
-    max_steps = 50000
-
-
-@ex.named_config
-def step100k():
-    max_epoch = 25
-    max_steps = 100000
-
-
-@ex.named_config
-def step200k():
-    max_epoch = 25
-    max_steps = 200000
+    max_epoch = 20
 
 
 @ex.named_config

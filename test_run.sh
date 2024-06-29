@@ -14,7 +14,7 @@ srun -N 1 -n 1 -c 3 -t 00:10:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
      data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/mmimdb/ \
      num_gpus=2 \
      num_nodes=1 \
-     per_gpu_batchsize=2 \
+     per_gpu_batchsize=16 \
      task_finetune_mmimdb \
      kronecker_prompts \
      step50k \

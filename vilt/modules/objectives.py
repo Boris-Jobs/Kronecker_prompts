@@ -279,9 +279,9 @@ def compute_mmimdb(pl_module, batch):
 
     phase = "train" if pl_module.training else "val"
     if phase == "train":
-        infer = pl_module.infer(batch, mask_text=False, mask_image=False)
+        infer = pl_module.infer(batch, mask_text=False, mask_image=False, is_train=True)
     else:
-        infer = pl_module.infer(batch, mask_text=False, mask_image=False)
+        infer = pl_module.infer(batch, mask_text=False, mask_image=False, is_train=False)
 
     imgcls_logits = pl_module.mmimdb_classifier(infer["cls_feats"])
     imgcls_labels = batch["label"]
@@ -305,11 +305,12 @@ def compute_mmimdb(pl_module, batch):
 
 
 def compute_hatememes(pl_module, batch):
+
     phase = "train" if pl_module.training else "val"
     if phase == "train":
-        infer = pl_module.infer(batch, mask_text=False, mask_image=False)
+        infer = pl_module.infer(batch, mask_text=False, mask_image=False, is_train=True)
     else:
-        infer = pl_module.infer(batch, mask_text=False, mask_image=False)
+        infer = pl_module.infer(batch, mask_text=False, mask_image=False, is_train=False)
 
     imgcls_logits = pl_module.hatememes_classifier(infer["cls_feats"])
 

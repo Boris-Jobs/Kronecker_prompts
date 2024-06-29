@@ -207,7 +207,7 @@ class ViLTransformerSS(pl.LightningModule):
         kro_prompt_A_i = torch.zeros(prompt_num, 2, 2)
         kro_prompt_A_i[:, 0, 0].fill_(1)
         kro_prompt_A_i[:, 1, 1].fill_(1)
-        kro_prompt_A_com = kro_prompt_A_i + kro_prompt_A_t
+        # kro_prompt_A_com = kro_prompt_A_i + kro_prompt_A_t
 
         kro_prompt_B1 = torch.randn(prompt_num, int(prompt_length / 2), 3)
         kro_prompt_B2 = torch.randn(prompt_num, int(prompt_length / 2), 3)
@@ -218,7 +218,7 @@ class ViLTransformerSS(pl.LightningModule):
         kro_prompt_C3 = torch.randn(prompt_num, 3, int(embed_dim / 2))
         kro_prompt_C4 = torch.randn(prompt_num, 3, int(embed_dim / 2))
 
-        self.kro_prompt_A_com = nn.Parameter(kro_prompt_A_com)
+        # self.kro_prompt_A_com = nn.Parameter(kro_prompt_A_com)
         self.kro_prompt_A_t = nn.Parameter(kro_prompt_A_t)
         self.kro_prompt_A_i = nn.Parameter(kro_prompt_A_i)
         self.kro_prompt_B1 = nn.Parameter(kro_prompt_B1)
@@ -234,7 +234,7 @@ class ViLTransformerSS(pl.LightningModule):
             self.complete_prompt.requires_grad = False
             self.missing_text_prompt.requires_grad = False
             self.missing_img_prompt.requires_grad = False
-            self.kro_prompt_A_com.requires_grad = False
+            # self.kro_prompt_A_com.requires_grad = False
             self.kro_prompt_A_i.requires_grad = False
             self.kro_prompt_A_t.requires_grad = False
             self.kro_prompt_B1.requires_grad = False
@@ -263,6 +263,7 @@ class ViLTransformerSS(pl.LightningModule):
             state_dict = ckpt["state_dict"]
             self.load_state_dict(state_dict, strict=False)
         self.records = {}
+        self.with_delta_infer = self.hparams.config["with_delta_infer"]
 
 
 
@@ -270,33 +271,29 @@ class ViLTransformerSS(pl.LightningModule):
 
     def infer(
         self,
-        batch,  # 包含输入数据的字典
+        batch,
         mask_text=False,
-        mask_image=False,  # 是否应用 image mask
+        mask_image=False,
         image_token_type_idx=1,
-        image_embeds=None,  # 预先计算的 image embeds
-        image_masks=None,  # 预先计算的 image masks
-        is_train=None,
+        image_embeds=None,
+        image_masks=None,
+        is_train=None
     ):
-
         if f"image_{image_token_type_idx - 1}" in batch:
             imgkey = f"image_{image_token_type_idx - 1}"
         else:
             imgkey = "image"
-        # 寻找imgkey键名
 
         do_mlm = "_mlm" if mask_text else ""  # 是否设置masked language model
         text_ids = batch[f"text_ids{do_mlm}"]  # text_ids or text_ids_mlm
         text_labels = batch[f"text_labels{do_mlm}"]
-        text_masks = batch[
-            f"text_masks"
-        ]  # 掩码指出哪些是token实际文本数据，哪些是padding数据
+        text_masks = batch[f"text_masks"]  # 掩码指出哪些是token实际文本数据，哪些是padding数据
         text_embeds = self.text_embeddings(text_ids)  # 将文本字典ID变成嵌入向量
 
         img = batch[imgkey][0]
 
-        if image_embeds is None and image_masks is None:  # 判断图像是否处理
-
+        ######## 生成image和text的embeds ########
+        if image_embeds is None and image_masks is None:
             (
                 image_embeds,
                 image_masks,
@@ -307,24 +304,14 @@ class ViLTransformerSS(pl.LightningModule):
                 max_image_len=self.hparams.config["max_image_len"],
                 mask_it=mask_image,
             )
-
-
         else:
-            patch_index, image_labels = (
-                None,
-                None,
-            )
+            patch_index, image_labels = None, None
 
         text_embeds, image_embeds = (
             text_embeds + self.token_type_embeddings(torch.zeros_like(text_masks)),
-            image_embeds
-            + self.token_type_embeddings(
-                torch.full_like(image_masks, image_token_type_idx)
-            ),
+            image_embeds + self.token_type_embeddings(torch.full_like(image_masks, image_token_type_idx)),
         )
-
-        # instance wise missing aware prompts
-        prompts = None
+        ######## instance wise missing aware prompts ########
 
         def modified_kronecker_product(A, B1, B2, B3, B4, C1, C2, C3, C4):
             modified_Block1 = A[0, 0, 0] * (B1 @ C1)
@@ -336,154 +323,139 @@ class ViLTransformerSS(pl.LightningModule):
             res = torch.cat([cat_1, cat_2], dim=1)
             return res
 
-        if self.prompt_type == "kronecker":
+        device = next(self.parameters()).device
 
-            for idx in range(len(img)):
+        batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+
+        cls_feats_list = []
+        text_feats_list = []
+        image_feats_list = []
+        raw_cls_feats_list = []
+
+        for idx in range(len(img)):
+            if self.prompt_type == "kronecker":
                 if batch["missing_type"][idx] == 0:
                     prompt = modified_kronecker_product(
-                        self.kro_prompt_A_com, 
+                        (self.kro_prompt_A_t + self.kro_prompt_A_i),
                         self.kro_prompt_B1, self.kro_prompt_B2,
                         self.kro_prompt_B3, self.kro_prompt_B4,
                         self.kro_prompt_C1, self.kro_prompt_C2,
                         self.kro_prompt_C3, self.kro_prompt_C4
-                        )
+                    ).to(device) if (is_train or (not is_train and self.with_delta_infer)) else None
                 elif batch["missing_type"][idx] == 1:
                     prompt = modified_kronecker_product(
-                        self.kro_prompt_A_t, 
+                        self.kro_prompt_A_t,
                         self.kro_prompt_B1, self.kro_prompt_B2,
                         self.kro_prompt_B3, self.kro_prompt_B4,
                         self.kro_prompt_C1, self.kro_prompt_C2,
                         self.kro_prompt_C3, self.kro_prompt_C4
-                        )
+                    ).to(device)
                 elif batch["missing_type"][idx] == 2:
                     prompt = modified_kronecker_product(
-                        self.kro_prompt_A_i, 
+                        self.kro_prompt_A_i,
                         self.kro_prompt_B1, self.kro_prompt_B2,
                         self.kro_prompt_B3, self.kro_prompt_B4,
                         self.kro_prompt_C1, self.kro_prompt_C2,
                         self.kro_prompt_C3, self.kro_prompt_C4
-                        )
+                    ).to(device)
 
-                if prompt.size(0) != 1:
-                    prompt = prompt.unsqueeze(0)
-
-                if prompts is None:
-                    prompts = prompt
-                else:
-                    prompts = torch.cat([prompts, prompt], dim=0)
-                # 将样本的prompt合并成为prompts张量
-
-        elif self.prompt_type == "input" or self.prompt_type == "attention":
-            for idx in range(len(img)):
+            elif self.prompt_type == "input":
                 if batch["missing_type"][idx] == 0:
-                    prompt = self.complete_prompt
+                    prompt = self.complete_prompt if (is_train or (not is_train and self.with_delta_infer)) else None
                 elif batch["missing_type"][idx] == 1:
                     prompt = self.missing_text_prompt
                 elif batch["missing_type"][idx] == 2:
                     prompt = self.missing_img_prompt
-                # 0：完整数据、1：缺失文本、2：缺失图像
-                # 根据例如'missing_type': [1.0, 2.0],来确定使用哪一种prompt矩阵
+            elif self.prompt_type == "none":
+                prompt = None
 
-                if prompt.size(0) != 1:
-                    prompt = prompt.unsqueeze(0)
+            if prompt is not None and prompt.size(0) != 1:
+                prompt = prompt.unsqueeze(0)
 
-                if prompts is None:
-                    prompts = prompt
-                else:
-                    prompts = torch.cat([prompts, prompt], dim=0)
-                # 将样本的prompt合并成为prompts张量
-        elif self.prompt_type == "none":
-            prompt = None
-            prompts = None
-
-        # 初始化不同的masks
-        if self.learnt_p:
-            if self.prompt_type == "attention":
+            if self.learnt_p:
+                if self.prompt_type == "input" or self.prompt_type == "kronecker":
+                    prompt_masks = torch.ones(
+                        1,  # 对于每个样本，prompt_masks 的形状是 (1, ...)
+                        self.prompt_length * len(self.prompt_layers),
+                        dtype=text_embeds.dtype,
+                        device=text_embeds.device,
+                    ).long()
+            elif prompt is None:
+                prompt_masks = None
+            else:
                 prompt_masks = torch.ones(
-                    prompts.shape[0],
-                    self.prompt_length // 2,
-                    dtype=prompts.dtype,
-                    device=prompts.device,
+                    1,  # 对于每个样本，prompt_masks 的形状是 (1, ...)
+                    self.prompt_length,
+                    dtype=text_embeds.dtype,
+                    device=text_embeds.device,
                 ).long()
-            elif self.prompt_type == "input" or self.prompt_type == "kronecker":
-                prompt_masks = torch.ones(
-                    prompts.shape[0],
-                    self.prompt_length * len(self.prompt_layers),
-                    dtype=prompts.dtype,
-                    device=prompts.device,
-                ).long()
-        elif prompts == None:
-            prompt_masks = None
-        else:
-            prompt_masks = torch.ones(
-                prompts.shape[0],
-                self.prompt_length,
-                dtype=prompts.dtype,
-                device=prompts.device,
-            ).long()
-        # attention 提示类型：掩码长度为 self.prompt_length // 2
-        # input 提示类型：掩码长度为 self.prompt_length * len(self.prompt_layers)
-        # 如果不学习提示，掩码长度为 self.prompt_length
 
-        if prompts == None:
-            co_masks = torch.cat([text_masks, image_masks], dim=1)
-        else:
-            co_masks = torch.cat([prompt_masks, text_masks, image_masks], dim=1)
-        co_embeds = torch.cat([text_embeds, image_embeds], dim=1)
-        x = co_embeds.detach()
+            if prompt is None:
+                co_masks = torch.cat([text_masks[idx:idx+1], image_masks[idx:idx+1]], dim=1)
+            else:
+                co_masks = torch.cat([prompt_masks, text_masks[idx:idx+1], image_masks[idx:idx+1]], dim=1)
 
-        if self.prompt_type == "none":
-            for i, blk in enumerate(self.transformer.blocks):
-                    x, _attn = blk(x, mask=co_masks)
-        else:
-            for i, blk in enumerate(self.transformer.blocks):
-                if i in self.prompt_layers:
-                    if (
-                        self.multi_layer_prompt
-                    ):  # a flag indicating whether to use multiple prompts per layer or a single prompt for all layers
-                        x, _attn = blk(
-                            x,
-                            mask=co_masks,
-                            prompts=prompts[:, self.prompt_layers.index(i)],
-                            learnt_p=self.learnt_p,
-                            prompt_type=self.prompt_type,
-                        )
+            co_embeds = torch.cat([text_embeds, image_embeds], dim=1)
+
+            sample_x = co_embeds[idx:idx+1]
+
+            if self.prompt_type == "none" or ((not is_train) and (not self.with_delta_infer) and batch["missing_type"][idx] == 0 and (self.prompt_type == "kronecker" or "input")):
+                for i, blk in enumerate(self.transformer.blocks):
+                    sample_x, _attn = blk(sample_x, mask=co_masks)
+            else:
+                for i, blk in enumerate(self.transformer.blocks):
+                    if i in self.prompt_layers:
+                        if self.multi_layer_prompt:
+                            sample_x, _attn = blk(
+                                sample_x,
+                                mask=co_masks,
+                                prompts=prompt[:, self.prompt_layers.index(i)],
+                                learnt_p=self.learnt_p,
+                                prompt_type=self.prompt_type,
+                            )
+                        else:
+                            sample_x, _attn = blk(
+                                sample_x,
+                                mask=co_masks,
+                                prompts=prompt,
+                                learnt_p=self.learnt_p,
+                            )
                     else:
-                        x, _attn = blk(
-                            x, mask=co_masks, prompts=prompts, learnt_p=self.learnt_p
-                        )
-                else:
-                    x, _attn = blk(x, mask=co_masks)            
+                        sample_x, _attn = blk(sample_x, mask=co_masks)
 
+            if self.prompt_type == "input" or self.prompt_type == "kronecker":
+                total_prompt_len = len(self.prompt_layers) * (prompt.shape[-2] if prompt is not None else 0)
+            elif self.prompt_type == "none":
+                total_prompt_len = 0
 
-        x = self.transformer.norm(x)  # 输出归一化
+            text_feats = sample_x[:, total_prompt_len : total_prompt_len + text_embeds.shape[1]]
+            image_feats = sample_x[:, total_prompt_len + text_embeds.shape[1] :]
+            text_feats_list.append(text_feats)
+            image_feats_list.append(image_feats)
+            raw_cls_feats_list.append(sample_x[:, 0])
 
-        if self.prompt_type == "input" or self.prompt_type == "kronecker":
-            total_prompt_len = len(self.prompt_layers) * prompts.shape[-2]
-        elif self.prompt_type == "attention":
-            total_prompt_len = prompts.shape[-2]
-        elif self.prompt_type == "none":
-            total_prompt_len = 0
+        
+        # 将所有样本的特征拼接在一起
+        text_feats = torch.cat(text_feats_list, dim=0)
+        image_feats = torch.cat(image_feats_list, dim=0)
 
-        text_feats, image_feats = (
-            x[:, total_prompt_len : total_prompt_len + text_embeds.shape[1]],
-            x[:, total_prompt_len + text_embeds.shape[1] :],
-        )
+        # 将文本特征和图像特征拼接在一起
+        co_embeds_concat = torch.cat([text_feats, image_feats], dim=1)
 
-        if (
-            self.prompt_type == "input"
-            or self.prompt_type == "kronecker"
-            or self.prompt_type == "none"
-        ):
-            cls_feats = self.pooler(x[:, total_prompt_len : total_prompt_len + 1])
-        elif self.prompt_type == "attention":
-            cls_feats = self.pooler(x)
+        # 对拼接后的特征进行归一化
+        co_embeds_norm = self.transformer.norm(co_embeds_concat)
+        cls_feats_list = []
+        for idx in range(len(img)):
+            cls_feat = self.pooler(co_embeds_norm[idx:idx+1, 0:1])
+            cls_feats_list.append(cls_feat)
+        cls_feats = torch.cat(cls_feats_list, dim=0)
+        raw_cls_feats = torch.cat(raw_cls_feats_list, dim=0)
 
         ret = {
             "text_feats": text_feats,
             "image_feats": image_feats,
             "cls_feats": cls_feats,
-            "raw_cls_feats": x[:, 0],
+            "raw_cls_feats": raw_cls_feats,
             "image_labels": image_labels,
             "image_masks": image_masks,
             "text_labels": text_labels,
@@ -493,6 +465,8 @@ class ViLTransformerSS(pl.LightningModule):
         }
 
         return ret
+
+
 
     def forward(self, batch):
 
@@ -545,7 +519,6 @@ class ViLTransformerSS(pl.LightningModule):
         vilt_utils.epoch_wrapup(self)
 
     def test_step(self, batch, batch_idx):
-
         vilt_utils.set_task(self)
         output = self(batch)
         ret = dict()
