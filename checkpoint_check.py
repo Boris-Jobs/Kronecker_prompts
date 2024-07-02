@@ -30,7 +30,7 @@ def analyze_attention_layers(state_dict):
 
 
 def main():
-    checkpoint_path = "/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt"  # 替换为你的ckpt路径
+    checkpoint_path = "/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/20240630_041403_hateful_input_train_seed0_from_vilt_200k_mlm_itm/version_0/checkpoints/last.ckpt"  # 替换为你的ckpt路径
     checkpoint = load_checkpoint(checkpoint_path, use_gpu=True)
     print_checkpoint_structure(checkpoint)
     analyze_attention_layers(checkpoint["state_dict"])

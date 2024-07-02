@@ -17,8 +17,6 @@ def get_pretrained_tokenizer(from_pretrained):
     return BertTokenizer.from_pretrained("vilt/bert-base")
 
 
-
-
 class BaseDataModule(LightningDataModule):
     def __init__(self, _config):
         super().__init__()

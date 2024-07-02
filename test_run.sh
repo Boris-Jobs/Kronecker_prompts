@@ -1,39 +1,20 @@
 module load pytorch/1.12
 source /scratch/project_2007023/boris/envs/missing/bin/activate
 
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-LOG_FILE="/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/code_test_${TIMESTAMP}.txt"
+# 换测试的missing type的时候，需要修改===3===个地方的testm_
+# with_delta_infer每次修改顺带需要修改===2===个with或without
+# 切换prompt类型的时候,只需要ctrl F寻找到该类型替换即可
 
-# srun -N 1 -n 1 -t 00:15:00 --mem-per-cpu=32G --gres=gpu:a100:2 \
-#      -p gputest --account=project_2002243 python3 checkpoint_check.py \
-#      | tee "$LOG_FILE"
+srun -N 1 -n 1 -c 3 -t 00:15:00 --mem-per-cpu=32G --gres=gpu:a100:2 \
+        -p gputest --account=project_2002243 \
+        python3 run.py with \
+        data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
+        task_finetune_hatememes \
+        kronecker_prompts \
+        trainm_t_testm_t \
+        load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_kronecker_trainm_t_testm_t_seed0_from_vilt_200k_mlm_itm/version_0/checkpoints/last.ckpt \
+        with_delta_infer=False \
+        exp_name=hateful_kronecker_trainm_t_testm_t_without \
+        test_only=True \
+        | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_kronecker_trainm_t_testm_t_without.txt
 
-srun -N 1 -n 1 -c 3 -t 00:10:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gputest --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/mmimdb/ \
-     num_gpus=2 \
-     num_nodes=1 \
-     per_gpu_batchsize=16 \
-     task_finetune_mmimdb \
-     kronecker_prompts \
-     step50k \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=test_run \
-     | tee -a "$LOG_FILE"
-
-if [ $? -eq 0 ]; then
-    END_TIME=$(date +%Y%m%d_%H%M%S)
-    echo "Program finished at: $END_TIME" | tee -a "$LOG_FILE"
-
-    START_SEC=$(date -d "$START_TIME" +%s)
-    END_SEC=$(date -d "$END_TIME" +%s)
-    DIFF_SEC=$((END_SEC - START_SEC))
-
-    HOURS=$((DIFF_SEC / 3600))
-    MINUTES=$(((DIFF_SEC % 3600) / 60))
-    
-    echo "Elapsed time: ${HOURS}h ${MINUTES}m" | tee -a "$LOG_FILE"
-else
-    echo "Program failed to complete." | tee -a "$LOG_FILE"
-fi

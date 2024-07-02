@@ -17,40 +17,38 @@ def _loss_names(d):  # _ indicates it is not a part of public API.
     return ret
 
 
-@ex.config  # every parameter decorated by @ex.config would be transferred into _config.
+######## basic settings ########
+@ex.config
 def config():
-    exp_name = "vilt"
+    num_gpus = 2
+    num_nodes = 1
+    exp_name = None
     seed = 0
     datasets = ["coco", "vg", "sbu", "gcc"]
     loss_names = _loss_names({"itm": 1, "mlm": 1})
-    batch_size = 256  # this is a desired batch size; pl trainer will accumulate gradients when per step batch is smaller.
+    batch_size = 256
 
-    # eval config (for bash execution)
-    test_ratio = 0.5
-    test_type = "both"
+    test_ratio = 0.1
+    test_type = None
     test_exp_name = None
 
     # fix backbone model (ViLT) weights
     fix_model = True
 
     # missing modality config
-    missing_ratio = {"train": 0.5, "val": 0.5, "test": 0.5}
-    missing_type = {
-        "train": "both",
-        "val": "both",
-        "test": "both",
-    }  # ['text', 'image', 'both'] in VL tasks
+    missing_type = {"train": None, "val": None, "test": None}
+    missing_ratio = {"train": 0.1, "val": 0.1, "test": 0.1}
     both_ratio = 0.5  # missing both ratio
     missing_table_root = "./datasets/missing_tables/"
     simulate_missing = True
     with_delta_infer = None
 
     # missing_aware_prompts config
-    prompt_type = "kronecker"
+    prompt_type = None
     prompt_length = 16
-    learnt_p = True  # learnable prompts?
+    learnt_p = None  # learnable prompts?
     prompt_layers = [0, 1, 2, 3, 4, 5]
-    multi_layer_prompt = True
+    multi_layer_prompt = None
 
     # Image setting
     train_transform_keys = ["pixelbert"]
@@ -83,8 +81,8 @@ def config():
     learning_rate = 1e-4
     weight_decay = 0.01
     decay_power = 1
-    max_epoch = 20
-    warmup_steps = 2500
+    max_epoch = 250
+    warmup_steps = 0.1
     end_lr = 0
     lr_mult = 1  # multiply lr for downstream heads
 
@@ -112,48 +110,22 @@ def config():
     precision = 16
 
 
+######## dataset settings ########
 @ex.named_config
 def task_finetune_mmimdb():
-    exp_name = "finetune_mmimdb"
     datasets = ["mmimdb"]
     loss_names = _loss_names({"mmimdb": 1})
-    batch_size = 256
-    max_epoch = 20
-    warmup_steps = 0.1
     draw_false_image = 0
     learning_rate = 1e-2
     val_check_interval = 0.2
     weight_decay = 2e-2
     max_text_len = 1024
 
-@ex.named_config
-def kronecker_prompts():
-    prompt_type = "kronecker"
-    learnt_p = True
-    prompt_layers = [0, 1, 2, 3, 4, 5]
-    multi_layer_prompt = True
-
-@ex.named_config
-def input_prompts():
-    prompt_type = "input"
-    learnt_p = True
-    prompt_layers = [0, 1, 2, 3, 4, 5]
-    multi_layer_prompt = True   
-
-@ex.named_config
-def none_prompts():
-    prompt_type = "none"
-    learnt_p = False
-    multi_layer_prompt = False   
 
 @ex.named_config
 def task_finetune_hatememes():
-    exp_name = "finetune_hatememes"
     datasets = ["Hatefull_Memes"]
     loss_names = _loss_names({"hatememes": 1})
-    batch_size = 256
-    max_epoch = 20
-    warmup_steps = 0.1
     draw_false_image = 0
     learning_rate = 1e-2
     val_check_interval = 0.11
@@ -161,47 +133,78 @@ def task_finetune_hatememes():
     max_text_len = 128
 
 
+######## prompt settings ########
 @ex.named_config
-def task_finetune_food101():
-    exp_name = "finetune_food101"
-    datasets = ["Food101"]
-    loss_names = _loss_names({"food101": 1})
-    batch_size = 256
-    max_epoch = 20
-    warmup_steps = 0.1
-    draw_false_image = 0
-    learning_rate = 1e-2
-    val_check_interval = 0.2
-    weight_decay = 2e-2
-    max_text_len = 512
-
-
-# Named configs for "etc" which are orthogonal to "env" and "task", need to be added at the end
+def kronecker_prompts():
+    prompt_type = "kronecker"
+    learnt_p = True
+    multi_layer_prompt = True
 
 
 @ex.named_config
-def step25k():
-    max_epoch = 20
-
-@ex.named_config
-def step50k():
-    max_epoch = 20
+def input_prompts():
+    prompt_type = "input"
+    learnt_p = True
+    multi_layer_prompt = True
 
 
 @ex.named_config
-def vit32_base():
-    vit = "vit_base_patch32_384"
-    patch_size = 32
-    hidden_size = 768
-    num_heads = 12
-    num_layers = 12
+def none_prompts():
+    prompt_type = "none"
+    learnt_p = False
+    multi_layer_prompt = False
 
 
-# Named configs for "environment" which define gpus and nodes, and paths
+######## missing settings ########
 @ex.named_config
-def env_dandelin():
-    data_root = "/data2/dsets/dataset"
-    log_dir = "/data2/vilt/result"
-    num_gpus = 8
-    num_nodes = 1
+def trainm_i_testm_t():
+    test_type = "text"
+    missing_type = {"train": "image", "val": "image", "test": "text"}
 
+
+@ex.named_config
+def trainm_t_testm_t():
+    test_type = "text"
+    missing_type = {"train": "text", "val": "text", "test": "text"}
+
+
+@ex.named_config
+def trainm_b_testm_t():
+    test_type = "text"
+    missing_type = {"train": "both", "val": "both", "test": "text"}
+
+
+@ex.named_config
+def trainm_i_testm_i():
+    test_type = "image"
+    missing_type = {"train": "image", "val": "image", "test": "image"}
+
+
+@ex.named_config
+def trainm_t_testm_i():
+    test_type = "image"
+    missing_type = {"train": "text", "val": "text", "test": "image"}
+
+
+@ex.named_config
+def trainm_b_testm_i():
+    test_type = "image"
+    missing_type = {"train": "both", "val": "both", "test": "image"}
+
+
+@ex.named_config
+def trainm_i_testm_b():
+    test_type = "both"
+    missing_type = {"train": "image", "val": "image", "test": "both"}
+
+
+@ex.named_config
+def trainm_t_testm_b():
+    test_type = "both"
+    missing_type = {"train": "text", "val": "text", "test": "both"}
+
+
+@ex.named_config
+def trainm_b_testm_b():
+    test_type = "both"
+    missing_type = {"train": "both", "val": "both", "test": "both"}

@@ -57,6 +57,7 @@ def test_ablation(pl_module, loss_name, res):
         f.write(records + "\n")
 
 
+
 def epoch_wrapup(pl_module):
     phase = "train" if pl_module.training else "val"
     the_metric = 0
@@ -107,21 +108,6 @@ def epoch_wrapup(pl_module):
                 res = "AUROC: {0:.2f}, Accuracy: {1:.2f}".format(
                     100 * value, 100 * value2
                 )
-                test_ablation(pl_module, loss_name, res)
-
-        elif loss_name == "food101":
-            value = getattr(pl_module, f"{phase}_{loss_name}_accuracy").compute()
-            pl_module.log(f"{loss_name}/{phase}/accuracy_epoch", value)
-            getattr(pl_module, f"{phase}_{loss_name}_accuracy").reset()
-
-            pl_module.log(
-                f"{loss_name}/{phase}/loss_epoch",
-                getattr(pl_module, f"{phase}_{loss_name}_loss").compute(),
-            )
-            getattr(pl_module, f"{phase}_{loss_name}_loss").reset()
-
-            if pl_module.hparams.config["test_exp_name"] is not None:
-                res = "Accuracy: {0:.2f}".format(100 * value)
                 test_ablation(pl_module, loss_name, res)
 
         elif loss_name == "mmimdb":

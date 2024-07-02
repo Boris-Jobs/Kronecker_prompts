@@ -8,7 +8,6 @@ from vilt.modules import heads, objectives, vilt_utils
 import ipdb
 
 
-
 class ViLTransformerSS(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
@@ -170,36 +169,24 @@ class ViLTransformerSS(pl.LightningModule):
         complete_prompt = torch.zeros(prompt_num, prompt_length, embed_dim)
         complete_prompt[:, 0:1, :].fill_(1)
         if self.learnt_p and self.prompt_type == "attention":
-            complete_prompt[:, prompt_length // 2 : prompt_length // 2 + 1, :].fill_(
-                1
-            )
-        self.complete_prompt = nn.Parameter(
-            complete_prompt
-        )
+            complete_prompt[:, prompt_length // 2 : prompt_length // 2 + 1, :].fill_(1)
+        self.complete_prompt = nn.Parameter(complete_prompt)
 
         missing_text_prompt = torch.zeros(prompt_num, prompt_length, embed_dim)
         missing_text_prompt[:, 2:3, :].fill_(1)
         if self.learnt_p and self.prompt_type == "attention":
             missing_text_prompt[
                 :, prompt_length // 2 + 2 : prompt_length // 2 + 3, :
-            ].fill_(
-                1
-            )
-        self.missing_text_prompt = nn.Parameter(
-            missing_text_prompt
-        )
+            ].fill_(1)
+        self.missing_text_prompt = nn.Parameter(missing_text_prompt)
 
         missing_img_prompt = torch.zeros(prompt_num, prompt_length, embed_dim)
         missing_img_prompt[:, 1:2, :].fill_(1)
         if self.learnt_p and self.prompt_type == "attention":
             missing_img_prompt[
                 :, prompt_length // 2 + 1 : prompt_length // 2 + 2, :
-            ].fill_(
-                1
-            )
-        self.missing_img_prompt = nn.Parameter(
-            missing_img_prompt
-        )
+            ].fill_(1)
+        self.missing_img_prompt = nn.Parameter(missing_img_prompt)
 
         kro_prompt_A_t = torch.zeros(prompt_num, 2, 2)
         kro_prompt_A_t[:, 0, 1].fill_(1)
@@ -264,10 +251,7 @@ class ViLTransformerSS(pl.LightningModule):
             self.load_state_dict(state_dict, strict=False)
         self.records = {}
         self.with_delta_infer = self.hparams.config["with_delta_infer"]
-
-
-
-
+        print("Now, the prompt type is: ", self.prompt_type)
 
     def infer(
         self,
@@ -277,22 +261,25 @@ class ViLTransformerSS(pl.LightningModule):
         image_token_type_idx=1,
         image_embeds=None,
         image_masks=None,
-        is_train=None
+        is_train=None,
     ):
         if f"image_{image_token_type_idx - 1}" in batch:
             imgkey = f"image_{image_token_type_idx - 1}"
         else:
             imgkey = "image"
 
-        do_mlm = "_mlm" if mask_text else ""  # 是否设置masked language model
-        text_ids = batch[f"text_ids{do_mlm}"]  # text_ids or text_ids_mlm
+        do_mlm = "_mlm" if mask_text else ""
+        text_ids = batch[f"text_ids{do_mlm}"]
         text_labels = batch[f"text_labels{do_mlm}"]
-        text_masks = batch[f"text_masks"]  # 掩码指出哪些是token实际文本数据，哪些是padding数据
-        text_embeds = self.text_embeddings(text_ids)  # 将文本字典ID变成嵌入向量
+        text_masks = batch[
+            f"text_masks"
+        ]
+        print("original text is: ", batch['text'])
+        text_embeds = self.text_embeddings(text_ids)
 
         img = batch[imgkey][0]
 
-        ######## 生成image和text的embeds ########
+        ######## generate image and text embeds ########
         if image_embeds is None and image_masks is None:
             (
                 image_embeds,
@@ -309,9 +296,11 @@ class ViLTransformerSS(pl.LightningModule):
 
         text_embeds, image_embeds = (
             text_embeds + self.token_type_embeddings(torch.zeros_like(text_masks)),
-            image_embeds + self.token_type_embeddings(torch.full_like(image_masks, image_token_type_idx)),
+            image_embeds
+            + self.token_type_embeddings(
+                torch.full_like(image_masks, image_token_type_idx)
+            ),
         )
-        ######## instance wise missing aware prompts ########
 
         def modified_kronecker_product(A, B1, B2, B3, B4, C1, C2, C3, C4):
             modified_Block1 = A[0, 0, 0] * (B1 @ C1)
@@ -325,7 +314,10 @@ class ViLTransformerSS(pl.LightningModule):
 
         device = next(self.parameters()).device
 
-        batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+        batch = {
+            k: v.to(device) if isinstance(v, torch.Tensor) else v
+            for k, v in batch.items()
+        }
 
         cls_feats_list = []
         text_feats_list = []
@@ -335,33 +327,53 @@ class ViLTransformerSS(pl.LightningModule):
         for idx in range(len(img)):
             if self.prompt_type == "kronecker":
                 if batch["missing_type"][idx] == 0:
-                    prompt = modified_kronecker_product(
-                        (self.kro_prompt_A_t + self.kro_prompt_A_i),
-                        self.kro_prompt_B1, self.kro_prompt_B2,
-                        self.kro_prompt_B3, self.kro_prompt_B4,
-                        self.kro_prompt_C1, self.kro_prompt_C2,
-                        self.kro_prompt_C3, self.kro_prompt_C4
-                    ).to(device) if (is_train or (not is_train and self.with_delta_infer)) else None
+                    prompt = (
+                        modified_kronecker_product(
+                            (self.kro_prompt_A_t + self.kro_prompt_A_i),
+                            self.kro_prompt_B1,
+                            self.kro_prompt_B2,
+                            self.kro_prompt_B3,
+                            self.kro_prompt_B4,
+                            self.kro_prompt_C1,
+                            self.kro_prompt_C2,
+                            self.kro_prompt_C3,
+                            self.kro_prompt_C4,
+                        ).to(device)
+                        if (is_train or (not is_train and self.with_delta_infer))
+                        else None
+                    )
                 elif batch["missing_type"][idx] == 1:
                     prompt = modified_kronecker_product(
                         self.kro_prompt_A_t,
-                        self.kro_prompt_B1, self.kro_prompt_B2,
-                        self.kro_prompt_B3, self.kro_prompt_B4,
-                        self.kro_prompt_C1, self.kro_prompt_C2,
-                        self.kro_prompt_C3, self.kro_prompt_C4
+                        self.kro_prompt_B1,
+                        self.kro_prompt_B2,
+                        self.kro_prompt_B3,
+                        self.kro_prompt_B4,
+                        self.kro_prompt_C1,
+                        self.kro_prompt_C2,
+                        self.kro_prompt_C3,
+                        self.kro_prompt_C4,
                     ).to(device)
                 elif batch["missing_type"][idx] == 2:
                     prompt = modified_kronecker_product(
                         self.kro_prompt_A_i,
-                        self.kro_prompt_B1, self.kro_prompt_B2,
-                        self.kro_prompt_B3, self.kro_prompt_B4,
-                        self.kro_prompt_C1, self.kro_prompt_C2,
-                        self.kro_prompt_C3, self.kro_prompt_C4
+                        self.kro_prompt_B1,
+                        self.kro_prompt_B2,
+                        self.kro_prompt_B3,
+                        self.kro_prompt_B4,
+                        self.kro_prompt_C1,
+                        self.kro_prompt_C2,
+                        self.kro_prompt_C3,
+                        self.kro_prompt_C4,
                     ).to(device)
 
             elif self.prompt_type == "input":
                 if batch["missing_type"][idx] == 0:
-                    prompt = self.complete_prompt if (is_train or (not is_train and self.with_delta_infer)) else None
+                    prompt = (
+                        self.complete_prompt
+                        if (is_train or (not is_train and self.with_delta_infer))
+                        else None
+                    )
                 elif batch["missing_type"][idx] == 1:
                     prompt = self.missing_text_prompt
                 elif batch["missing_type"][idx] == 2:
@@ -391,15 +403,29 @@ class ViLTransformerSS(pl.LightningModule):
                 ).long()
 
             if prompt is None:
-                co_masks = torch.cat([text_masks[idx:idx+1], image_masks[idx:idx+1]], dim=1)
+                co_masks = torch.cat(
+                    [text_masks[idx : idx + 1], image_masks[idx : idx + 1]], dim=1
+                )
             else:
-                co_masks = torch.cat([prompt_masks, text_masks[idx:idx+1], image_masks[idx:idx+1]], dim=1)
+                co_masks = torch.cat(
+                    [
+                        prompt_masks,
+                        text_masks[idx : idx + 1],
+                        image_masks[idx : idx + 1],
+                    ],
+                    dim=1,
+                )
 
             co_embeds = torch.cat([text_embeds, image_embeds], dim=1)
 
-            sample_x = co_embeds[idx:idx+1]
+            sample_x = co_embeds[idx : idx + 1]
 
-            if self.prompt_type == "none" or ((not is_train) and (not self.with_delta_infer) and batch["missing_type"][idx] == 0 and (self.prompt_type == "kronecker" or "input")):
+            if self.prompt_type == "none" or (
+                (not is_train)
+                and (not self.with_delta_infer)
+                and batch["missing_type"][idx] == 0
+                and (self.prompt_type == "kronecker" or "input")
+            ):
                 for i, blk in enumerate(self.transformer.blocks):
                     sample_x, _attn = blk(sample_x, mask=co_masks)
             else:
@@ -424,17 +450,20 @@ class ViLTransformerSS(pl.LightningModule):
                         sample_x, _attn = blk(sample_x, mask=co_masks)
 
             if self.prompt_type == "input" or self.prompt_type == "kronecker":
-                total_prompt_len = len(self.prompt_layers) * (prompt.shape[-2] if prompt is not None else 0)
+                total_prompt_len = len(self.prompt_layers) * (
+                    prompt.shape[-2] if prompt is not None else 0
+                )
             elif self.prompt_type == "none":
                 total_prompt_len = 0
 
-            text_feats = sample_x[:, total_prompt_len : total_prompt_len + text_embeds.shape[1]]
+            text_feats = sample_x[
+                :, total_prompt_len : total_prompt_len + text_embeds.shape[1]
+            ]
             image_feats = sample_x[:, total_prompt_len + text_embeds.shape[1] :]
             text_feats_list.append(text_feats)
             image_feats_list.append(image_feats)
             raw_cls_feats_list.append(sample_x[:, 0])
 
-        
         # 将所有样本的特征拼接在一起
         text_feats = torch.cat(text_feats_list, dim=0)
         image_feats = torch.cat(image_feats_list, dim=0)
@@ -446,7 +475,7 @@ class ViLTransformerSS(pl.LightningModule):
         co_embeds_norm = self.transformer.norm(co_embeds_concat)
         cls_feats_list = []
         for idx in range(len(img)):
-            cls_feat = self.pooler(co_embeds_norm[idx:idx+1, 0:1])
+            cls_feat = self.pooler(co_embeds_norm[idx : idx + 1, 0:1])
             cls_feats_list.append(cls_feat)
         cls_feats = torch.cat(cls_feats_list, dim=0)
         raw_cls_feats = torch.cat(raw_cls_feats_list, dim=0)
@@ -465,8 +494,6 @@ class ViLTransformerSS(pl.LightningModule):
         }
 
         return ret
-
-
 
     def forward(self, batch):
 
@@ -494,10 +521,6 @@ class ViLTransformerSS(pl.LightningModule):
         # Multi-label classification for MM-IMDb
         if "mmimdb" in self.current_tasks:
             ret.update(objectives.compute_mmimdb(self, batch))
-
-        # Classification for Food101
-        if "food101" in self.current_tasks:
-            ret.update(objectives.compute_food101(self, batch))
 
         return ret
 
@@ -532,5 +555,3 @@ class ViLTransformerSS(pl.LightningModule):
 
     def configure_optimizers(self):
         return vilt_utils.set_schedule(self)
-    
-

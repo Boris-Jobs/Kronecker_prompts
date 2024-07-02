@@ -70,8 +70,7 @@ def main(_config):  # variables from vilt.config.config().
         accelerator="ddp",
         benchmark=True,
         deterministic=True,
-        max_epochs=20,
-        # max_epochs=_config["max_epoch"] if max_steps is None else 1000,  # eopch setting
+        max_epochs=_config["max_epoch"],
         max_steps=None,
         callbacks=callbacks,
         logger=logger,
