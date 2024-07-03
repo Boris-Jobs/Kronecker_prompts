@@ -55,12 +55,7 @@ def main(_config):  # variables from vilt.config.config().
     grad_steps = _config["batch_size"] // (
         _config["per_gpu_batchsize"] * num_gpus * _config["num_nodes"]
     )
-    print(
-        _config["batch_size"],
-        _config["per_gpu_batchsize"],
-        num_gpus,
-        _config["num_nodes"],
-    )
+
     # max_steps = _config["max_steps"] if _config["max_steps"] is not None else None
 
     trainer = pl.Trainer(
@@ -76,7 +71,7 @@ def main(_config):  # variables from vilt.config.config().
         logger=logger,
         # prepare_data_per_node=False,
         replace_sampler_ddp=False,
-        accumulate_grad_batches=1,
+        accumulate_grad_batches=grad_steps,
         log_every_n_steps=10,
         flush_logs_every_n_steps=10,
         resume_from_checkpoint=_config["resume_from"],

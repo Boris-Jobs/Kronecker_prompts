@@ -81,16 +81,6 @@ class ViLTransformerSS(pl.LightningModule):
 
         hs = self.hparams.config["hidden_size"]
 
-        if self.hparams.config["loss_names"]["vqa"] > 0:
-            vs = self.hparams.config["vqav2_label_size"]
-            self.vqa_classifier = nn.Sequential(
-                nn.Linear(hs, hs * 2),
-                nn.LayerNorm(hs * 2),
-                nn.GELU(),
-                nn.Linear(hs * 2, vs),
-            )
-            self.vqa_classifier.apply(objectives.init_weights)
-
         if self.hparams.config["loss_names"]["hatememes"] > 0:
             cls_num = self.hparams.config["hatememes_class_num"]
             self.hatememes_classifier = nn.Sequential(
@@ -100,16 +90,6 @@ class ViLTransformerSS(pl.LightningModule):
                 nn.Linear(hs * 2, cls_num),
             )
             self.hatememes_classifier.apply(objectives.init_weights)
-
-        if self.hparams.config["loss_names"]["food101"] > 0:
-            cls_num = self.hparams.config["food101_class_num"]
-            self.food101_classifier = nn.Sequential(
-                nn.Linear(hs, hs * 2),
-                nn.LayerNorm(hs * 2),
-                nn.GELU(),
-                nn.Linear(hs * 2, cls_num),
-            )
-            self.food101_classifier.apply(objectives.init_weights)
 
         if self.hparams.config["loss_names"]["mmimdb"] > 0:
             cls_num = self.hparams.config["mmimdb_class_num"]
@@ -142,28 +122,6 @@ class ViLTransformerSS(pl.LightningModule):
                 for param in self.token_type_embeddings.parameters():
                     param.requires_grad = False
 
-        if self.hparams.config["loss_names"]["nlvr2"] > 0:
-            self.nlvr2_classifier = nn.Sequential(
-                nn.Linear(hs * 2, hs * 2),
-                nn.LayerNorm(hs * 2),
-                nn.GELU(),
-                nn.Linear(hs * 2, 2),
-            )
-            self.nlvr2_classifier.apply(objectives.init_weights)
-            emb_data = self.token_type_embeddings.weight.data
-            self.token_type_embeddings = nn.Embedding(3, hs)
-            self.token_type_embeddings.apply(objectives.init_weights)
-            self.token_type_embeddings.weight.data[0, :] = emb_data[0, :]
-            self.token_type_embeddings.weight.data[1, :] = emb_data[1, :]
-            self.token_type_embeddings.weight.data[2, :] = emb_data[1, :]
-
-        if self.hparams.config["loss_names"]["irtr"] > 0:
-            self.rank_output = nn.Linear(hs, 1)
-            self.rank_output.weight.data = self.itm_score.fc.weight.data[1:, :]
-            self.rank_output.bias.data = self.itm_score.fc.bias.data[1:]
-            self.margin = 0.2
-            for p in self.itm_score.parameters():
-                p.requires_grad = False
 
         vilt_utils.set_metrics(self)
         self.current_tasks = list()

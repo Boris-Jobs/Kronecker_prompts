@@ -57,7 +57,6 @@ def test_ablation(pl_module, loss_name, res):
         f.write(records + "\n")
 
 
-
 def epoch_wrapup(pl_module):
     phase = "train" if pl_module.training else "val"
     the_metric = 0
@@ -253,14 +252,7 @@ def set_schedule(pl_module):
         },
     ]
 
-    if optim_type == "adamw":
-        optimizer = AdamW(
-            optimizer_grouped_parameters, lr=lr, eps=1e-8, betas=(0.9, 0.98)
-        )
-    elif optim_type == "adam":
-        optimizer = torch.optim.Adam(optimizer_grouped_parameters, lr=lr)
-    elif optim_type == "sgd":
-        optimizer = torch.optim.SGD(optimizer_grouped_parameters, lr=lr, momentum=0.9)
+    optimizer = AdamW(optimizer_grouped_parameters, lr=lr, eps=1e-8, betas=(0.9, 0.98))
 
     if pl_module.trainer.max_steps is None:
         max_steps = (
@@ -292,7 +284,18 @@ def set_schedule(pl_module):
 
     sched = {"scheduler": scheduler, "interval": "step"}
 
-    return (
-        [optimizer],
-        [sched],
-    )
+    # # Debugging: Check the parameter groups
+    # for i, group in enumerate(optimizer_grouped_parameters):
+    #     param_ids = [id(p) for p in group['params']]
+    #     print(f"Params in group {i}: {[n for n, p in pl_module.named_parameters() if id(p) in param_ids]}")
+
+    # for n, p in pl_module.named_parameters():
+    #     if p.grad is not None:
+    #         print(f"Gradient for {n}: {p.grad.norm()}")
+
+    # print(f"Optimizer: {optimizer}")
+    # print(f"Scheduler: {scheduler}")
+
+    # print("the lr is: ", lr)
+
+    return ([optimizer], [sched])

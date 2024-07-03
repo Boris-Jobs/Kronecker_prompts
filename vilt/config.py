@@ -26,9 +26,9 @@ def config():
     seed = 0
     datasets = ["coco", "vg", "sbu", "gcc"]
     loss_names = _loss_names({"itm": 1, "mlm": 1})
-    batch_size = 256
+    batch_size = 32
 
-    test_ratio = 0.1
+    test_ratio = 0.8
     test_type = None
     test_exp_name = None
 
@@ -37,7 +37,7 @@ def config():
 
     # missing modality config
     missing_type = {"train": None, "val": None, "test": None}
-    missing_ratio = {"train": 0.1, "val": 0.1, "test": 0.1}
+    missing_ratio = {"train": test_ratio, "val": test_ratio, "test": test_ratio}
     both_ratio = 0.5  # missing both ratio
     missing_table_root = "./datasets/missing_tables/"
     simulate_missing = True
@@ -46,7 +46,7 @@ def config():
     # missing_aware_prompts config
     prompt_type = None
     prompt_length = 16
-    learnt_p = None  # learnable prompts?
+    learnt_p = None
     prompt_layers = [0, 1, 2, 3, 4, 5]
     multi_layer_prompt = None
 
@@ -78,11 +78,11 @@ def config():
 
     # Optimizer Setting
     optim_type = "adamw"
-    learning_rate = 1e-4
-    weight_decay = 0.01
+    learning_rate = 1e-2
+    weight_decay = 0.02
     decay_power = 1
-    max_epoch = 250
-    warmup_steps = 0.1
+    max_epoch = 5
+    warmup_steps = 100
     end_lr = 0
     lr_mult = 1  # multiply lr for downstream heads
 
@@ -95,7 +95,7 @@ def config():
     # PL Trainer Setting
     resume_from = None
     fast_dev_run = False
-    val_check_interval = 1.0
+    val_check_interval = None
     test_only = False
     finetune_first = False
 
@@ -116,20 +116,16 @@ def task_finetune_mmimdb():
     datasets = ["mmimdb"]
     loss_names = _loss_names({"mmimdb": 1})
     draw_false_image = 0
-    learning_rate = 1e-2
     val_check_interval = 0.2
-    weight_decay = 2e-2
     max_text_len = 1024
 
 
 @ex.named_config
-def task_finetune_hatememes():
+def task_finetune_hateful_memes():
     datasets = ["Hatefull_Memes"]
     loss_names = _loss_names({"hatememes": 1})
     draw_false_image = 0
-    learning_rate = 1e-2
     val_check_interval = 0.11
-    weight_decay = 2e-2
     max_text_len = 128
 
 

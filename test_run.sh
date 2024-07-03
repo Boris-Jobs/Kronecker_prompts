@@ -9,12 +9,12 @@ srun -N 1 -n 1 -c 3 -t 00:15:00 --mem-per-cpu=32G --gres=gpu:a100:2 \
         -p gputest --account=project_2002243 \
         python3 run.py with \
         data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-        task_finetune_hatememes \
+        task_finetune_hateful_memes \
         kronecker_prompts \
         trainm_t_testm_t \
-        load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_kronecker_trainm_t_testm_t_seed0_from_vilt_200k_mlm_itm/version_0/checkpoints/last.ckpt \
-        with_delta_infer=False \
-        exp_name=hateful_kronecker_trainm_t_testm_t_without \
+        load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
+        with_delta_infer=True \
+        exp_name=test_only \
         test_only=True \
-        | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_kronecker_trainm_t_testm_t_without.txt
+        | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/test_only.txt
 

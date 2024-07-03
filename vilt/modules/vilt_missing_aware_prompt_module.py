@@ -194,7 +194,6 @@ class ViLTransformerSS(pl.LightningModule):
         kro_prompt_A_i = torch.zeros(prompt_num, 2, 2)
         kro_prompt_A_i[:, 0, 0].fill_(1)
         kro_prompt_A_i[:, 1, 1].fill_(1)
-        # kro_prompt_A_com = kro_prompt_A_i + kro_prompt_A_t
 
         kro_prompt_B1 = torch.randn(prompt_num, int(prompt_length / 2), 3)
         kro_prompt_B2 = torch.randn(prompt_num, int(prompt_length / 2), 3)
@@ -205,7 +204,6 @@ class ViLTransformerSS(pl.LightningModule):
         kro_prompt_C3 = torch.randn(prompt_num, 3, int(embed_dim / 2))
         kro_prompt_C4 = torch.randn(prompt_num, 3, int(embed_dim / 2))
 
-        # self.kro_prompt_A_com = nn.Parameter(kro_prompt_A_com)
         self.kro_prompt_A_t = nn.Parameter(kro_prompt_A_t)
         self.kro_prompt_A_i = nn.Parameter(kro_prompt_A_i)
         self.kro_prompt_B1 = nn.Parameter(kro_prompt_B1)
@@ -216,22 +214,6 @@ class ViLTransformerSS(pl.LightningModule):
         self.kro_prompt_C2 = nn.Parameter(kro_prompt_C2)
         self.kro_prompt_C3 = nn.Parameter(kro_prompt_C3)
         self.kro_prompt_C4 = nn.Parameter(kro_prompt_C4)
-
-        if not self.learnt_p:
-            self.complete_prompt.requires_grad = False
-            self.missing_text_prompt.requires_grad = False
-            self.missing_img_prompt.requires_grad = False
-            # self.kro_prompt_A_com.requires_grad = False
-            self.kro_prompt_A_i.requires_grad = False
-            self.kro_prompt_A_t.requires_grad = False
-            self.kro_prompt_B1.requires_grad = False
-            self.kro_prompt_B2.requires_grad = False
-            self.kro_prompt_B3.requires_grad = False
-            self.kro_prompt_B4.requires_grad = False
-            self.kro_prompt_C1.requires_grad = False
-            self.kro_prompt_C2.requires_grad = False
-            self.kro_prompt_C3.requires_grad = False
-            self.kro_prompt_C4.requires_grad = False
 
         for param in self.transformer.parameters():
             param.requires_grad = False
@@ -249,6 +231,10 @@ class ViLTransformerSS(pl.LightningModule):
             ckpt = torch.load(self.hparams.config["load_path"], map_location="cpu")
             state_dict = ckpt["state_dict"]
             self.load_state_dict(state_dict, strict=False)
+            print("the A matrices: ", 
+                  state_dict['kro_prompt_A_t'], 
+                  state_dict['kro_prompt_A_i'])
+
         self.records = {}
         self.with_delta_infer = self.hparams.config["with_delta_infer"]
         print("Now, the prompt type is: ", self.prompt_type)
@@ -271,10 +257,8 @@ class ViLTransformerSS(pl.LightningModule):
         do_mlm = "_mlm" if mask_text else ""
         text_ids = batch[f"text_ids{do_mlm}"]
         text_labels = batch[f"text_labels{do_mlm}"]
-        text_masks = batch[
-            f"text_masks"
-        ]
-        print("original text is: ", batch['text'])
+        text_masks = batch[f"text_masks"]
+
         text_embeds = self.text_embeddings(text_ids)
 
         img = batch[imgkey][0]
@@ -384,6 +368,7 @@ class ViLTransformerSS(pl.LightningModule):
             if prompt is not None and prompt.size(0) != 1:
                 prompt = prompt.unsqueeze(0)
 
+            ######## Generate the prompt masks ########
             if self.learnt_p:
                 if self.prompt_type == "input" or self.prompt_type == "kronecker":
                     prompt_masks = torch.ones(
@@ -502,18 +487,6 @@ class ViLTransformerSS(pl.LightningModule):
             ret.update(self.infer(batch))
             return ret
 
-        # Masked Language Modeling
-        if "mlm" in self.current_tasks:
-            ret.update(objectives.compute_mlm(self, batch))
-
-        # Masked Patch Prediction
-        if "mpp" in self.current_tasks:
-            ret.update(objectives.compute_mpp(self, batch))
-
-        # Image Text Matching
-        if "itm" in self.current_tasks:
-            ret.update(objectives.compute_itm_wpa(self, batch))
-
         # Binary classification for Hateful Memes
         if "hatememes" in self.current_tasks:
             ret.update(objectives.compute_hatememes(self, batch))
@@ -526,8 +499,15 @@ class ViLTransformerSS(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         vilt_utils.set_task(self)
+
+        # Forward pass
         output = self(batch)
+
+        # Compute total loss
         total_loss = sum([v for k, v in output.items() if "loss" in k])
+
+        # Log loss for debugging
+        self.log("train_loss", total_loss, prog_bar=True, logger=True)
 
         return total_loss
 
@@ -555,3 +535,211 @@ class ViLTransformerSS(pl.LightningModule):
 
     def configure_optimizers(self):
         return vilt_utils.set_schedule(self)
+
+
+"""
+    def infer(
+        self,
+        batch,
+        mask_text=False,
+        mask_image=False,
+        image_token_type_idx=1,
+        image_embeds=None,
+        image_masks=None,
+        is_train=None
+    ):
+        if f"image_{image_token_type_idx - 1}" in batch:
+            imgkey = f"image_{image_token_type_idx - 1}"
+        else:
+            imgkey = "image"
+
+        do_mlm = "_mlm" if mask_text else ""
+        text_ids = batch[f"text_ids{do_mlm}"]
+        text_labels = batch[f"text_labels{do_mlm}"]
+        text_masks = batch[f"text_masks"]
+        print("original text is: ", batch["text"])
+        text_embeds = self.text_embeddings(text_ids)
+
+        img = batch[imgkey][0]
+
+        ######## generate image and text embeds ########
+        if image_embeds is None and image_masks is None:
+            (
+                image_embeds,
+                image_masks,
+                patch_index,
+                image_labels,
+            ) = self.transformer.visual_embed(
+                img,
+                max_image_len=self.hparams.config["max_image_len"],
+                mask_it=mask_image,
+            )
+        else:
+            patch_index, image_labels = None, None
+
+        text_embeds, image_embeds = (
+            text_embeds + self.token_type_embeddings(torch.zeros_like(text_masks)),
+            image_embeds
+            + self.token_type_embeddings(
+                torch.full_like(image_masks, image_token_type_idx)
+            ),
+        )
+
+        def modified_kronecker_product(A, B1, B2, B3, B4, C1, C2, C3, C4):
+            modified_Block1 = A[0, 0, 0] * (B1 @ C1)
+            modified_Block2 = A[0, 0, 1] * (B2 @ C2)
+            modified_Block3 = A[0, 1, 0] * (B3 @ C3)
+            modified_Block4 = A[0, 1, 1] * (B4 @ C4)
+            cat_1 = torch.cat([modified_Block1, modified_Block2], dim=2)
+            cat_2 = torch.cat([modified_Block3, modified_Block4], dim=2)
+            res = torch.cat([cat_1, cat_2], dim=1)
+            return res
+
+        prompts = None
+
+
+        for idx in range(len(img)):
+            if self.prompt_type == "kronecker":
+                if batch["missing_type"][idx] == 0:
+                    prompt = modified_kronecker_product(
+                        (self.kro_prompt_A_t + self.kro_prompt_A_i),
+                        self.kro_prompt_B1,
+                        self.kro_prompt_B2,
+                        self.kro_prompt_B3,
+                        self.kro_prompt_B4,
+                        self.kro_prompt_C1,
+                        self.kro_prompt_C2,
+                        self.kro_prompt_C3,
+                        self.kro_prompt_C4,
+                    )
+                    print(
+                        "to see the prompts changed or not",
+                        self.kro_prompt_A_t + self.kro_prompt_A_i,
+                    )
+                    print("requires_grad is: ", self.kro_prompt_A_t.requires_grad)
+
+                elif batch["missing_type"][idx] == 1:
+                    prompt = modified_kronecker_product(
+                        self.kro_prompt_A_t,
+                        self.kro_prompt_B1,
+                        self.kro_prompt_B2,
+                        self.kro_prompt_B3,
+                        self.kro_prompt_B4,
+                        self.kro_prompt_C1,
+                        self.kro_prompt_C2,
+                        self.kro_prompt_C3,
+                        self.kro_prompt_C4,
+                    )
+                elif batch["missing_type"][idx] == 2:
+                    prompt = modified_kronecker_product(
+                        self.kro_prompt_A_i,
+                        self.kro_prompt_B1,
+                        self.kro_prompt_B2,
+                        self.kro_prompt_B3,
+                        self.kro_prompt_B4,
+                        self.kro_prompt_C1,
+                        self.kro_prompt_C2,
+                        self.kro_prompt_C3,
+                        self.kro_prompt_C4,
+                    )
+
+            elif self.prompt_type == "input":
+                if batch["missing_type"][idx] == 0:
+                    prompt = self.complete_prompt
+                    print("the complete prompt is: ", self.complete_prompt)
+                elif batch["missing_type"][idx] == 1:
+                    prompt = self.missing_text_prompt
+                elif batch["missing_type"][idx] == 2:
+                    prompt = self.missing_img_prompt
+            elif self.prompt_type == "none":
+                prompt = None
+
+            if prompt is not None and prompt.size(0) != 1:
+                prompt = prompt.unsqueeze(0)
+
+            if prompts is None:
+                prompts = prompt
+            else:
+                prompts = torch.cat([prompts, prompt], dim=0)
+
+        ######## Generate the prompt masks ########
+        if self.learnt_p:
+            if self.prompt_type == "input" or self.prompt_type == "kronecker":
+                prompt_masks = torch.ones(
+                    prompts.shape[0],
+                    self.prompt_length * len(self.prompt_layers),
+                    dtype=prompts.dtype,
+                    device=prompts.device,
+                ).long()
+        elif prompt is None:
+            prompt_masks = None
+        else:
+            prompt_masks = torch.ones(
+                prompts.shape[0],
+                self.prompt_length,
+                dtype=prompts.dtype,
+                device=prompts.device,
+            ).long()
+
+        ######## Generate co masks and embeds ########
+        if prompt is None:
+            co_masks = torch.cat([text_masks, image_masks], dim=1)
+        else:
+            co_masks = torch.cat([prompt_masks, text_masks, image_masks], dim=1)
+
+        co_embeds = torch.cat([text_embeds, image_embeds], dim=1)
+        x = co_embeds.detach()
+
+        ######## forward to attention blocks ########
+        if self.prompt_type == "none":
+            for i, blk in enumerate(self.transformer.blocks):
+                x, _attn = blk(x, mask=co_masks)
+        else:
+            for i, blk in enumerate(self.transformer.blocks):
+                if i in self.prompt_layers:
+                    if self.multi_layer_prompt:
+                        x, _attn = blk(
+                            x,
+                            mask=co_masks,
+                            prompts=prompts[:, self.prompt_layers.index(i)],
+                            learnt_p=self.learnt_p,
+                            prompt_type=self.prompt_type,
+                        )
+                    else:
+                        x, _attn = blk(
+                            x, mask=co_masks, prompts=prompts, learnt_p=self.learnt_p
+                        )
+                else:
+                    x, _attn = blk(x, mask=co_masks)
+        x = self.transformer.norm(x)
+
+        ######## Generate feats ########
+        if self.prompt_type == "input" or self.prompt_type == "kronecker":
+            total_prompt_len = len(self.prompt_layers) * (
+                prompt.shape[-2] if prompt is not None else 0
+            )
+        elif self.prompt_type == "none":
+            total_prompt_len = 0
+
+        text_feats, image_feats = (
+            x[:, total_prompt_len : total_prompt_len + text_embeds.shape[1]],
+            x[:, total_prompt_len + text_embeds.shape[1] :],
+        )
+
+        cls_feats = self.pooler(x[:, total_prompt_len : total_prompt_len + 1])
+
+        ret = {
+            "text_feats": text_feats,
+            "image_feats": image_feats,
+            "cls_feats": cls_feats,
+            "raw_cls_feats": x[:, 0],
+            "image_labels": image_labels,
+            "image_masks": image_masks,
+            "text_labels": text_labels,
+            "text_ids": text_ids,
+            "text_masks": text_masks,
+            "patch_index": patch_index,
+        }
+
+        return ret
+"""

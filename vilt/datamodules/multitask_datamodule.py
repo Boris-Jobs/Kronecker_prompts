@@ -19,13 +19,9 @@ class MTDataModule(LightningDataModule):
 
         self.dm_keys = datamodule_keys
         self.dm_dicts = {key: _datamodules[key](_config) for key in datamodule_keys}
-        # exmaple: self.dm_dicts = {"mmimdb": MMIMDBDataModule}
         self.dms = [v for k, v in self.dm_dicts.items()]
-        # example: self.dms = MMIMDBDataModule, 其中class MMIMDBDataModule(BaseDataModule)，BaseDataModule里面就有batch_size、vocab_size、num_workers等属性
-        # MMIMDBDataModule.dataset_cls = MMIMDBDataset, 其中class MMIMDBDataset(BaseDataset)
-        # BaseDataset类处理file *.arrow，即vilt.datasets.base_dataset
 
-        self.batch_size = self.dms[0].batch_size  # imdb中为256
+        self.batch_size = self.dms[0].batch_size
         self.vocab_size = self.dms[0].vocab_size
         self.num_workers = self.dms[0].num_workers
 

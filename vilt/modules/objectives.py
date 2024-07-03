@@ -278,12 +278,7 @@ def compute_itm_wpa(pl_module, batch):
 def compute_mmimdb(pl_module, batch):
 
     phase = "train" if pl_module.training else "val"
-    if phase == "train":
-        infer = pl_module.infer(batch, mask_text=False, mask_image=False, is_train=True)
-    else:
-        infer = pl_module.infer(
-            batch, mask_text=False, mask_image=False, is_train=False
-        )
+    infer = pl_module.infer(batch, mask_text=False, mask_image=False)
 
     imgcls_logits = pl_module.mmimdb_classifier(infer["cls_feats"])
     imgcls_labels = batch["label"]
@@ -309,12 +304,7 @@ def compute_mmimdb(pl_module, batch):
 def compute_hatememes(pl_module, batch):
 
     phase = "train" if pl_module.training else "val"
-    if phase == "train":
-        infer = pl_module.infer(batch, mask_text=False, mask_image=False, is_train=True)
-    else:
-        infer = pl_module.infer(
-            batch, mask_text=False, mask_image=False, is_train=False
-        )
+    infer = pl_module.infer(batch, mask_text=False, mask_image=False)
 
     imgcls_logits = pl_module.hatememes_classifier(infer["cls_feats"])
 
@@ -338,34 +328,6 @@ def compute_hatememes(pl_module, batch):
         ret["hatememes_logits"], ret["hatememes_labels"]
     )
     pl_module.log(f"hatememes/{phase}/loss", loss)
-
-    return ret
-
-
-def compute_food101(pl_module, batch):
-    phase = "train" if pl_module.training else "val"
-    if phase == "train":
-        infer = pl_module.infer(batch, mask_text=False, mask_image=False)
-    else:
-        infer = pl_module.infer(batch, mask_text=False, mask_image=False)
-
-    imgcls_logits = pl_module.food101_classifier(infer["cls_feats"])
-
-    imgcls_labels = batch["label"]
-    imgcls_labels = torch.tensor(imgcls_labels).to(pl_module.device).long()
-    imgcls_loss = F.cross_entropy(imgcls_logits, imgcls_labels)
-
-    ret = {
-        "food101_loss": imgcls_loss,
-        "food101_logits": imgcls_logits,
-        "food101_labels": imgcls_labels,
-    }
-
-    loss = getattr(pl_module, f"{phase}_food101_loss")(ret["food101_loss"])
-    acc = getattr(pl_module, f"{phase}_food101_accuracy")(
-        ret["food101_logits"], ret["food101_labels"]
-    )
-    pl_module.log(f"food101/{phase}/loss", loss)
 
     return ret
 
