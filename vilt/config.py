@@ -20,15 +20,13 @@ def _loss_names(d):  # _ indicates it is not a part of public API.
 ######## basic settings ########
 @ex.config
 def config():
-    num_gpus = 2
-    num_nodes = 1
     exp_name = None
-    seed = 0
+    seed = 1015
     datasets = ["coco", "vg", "sbu", "gcc"]
     loss_names = _loss_names({"itm": 1, "mlm": 1})
-    batch_size = 32
+    batch_size = 4096
 
-    test_ratio = 0.8
+    test_ratio = 0
     test_type = None
     test_exp_name = None
 
@@ -37,7 +35,7 @@ def config():
 
     # missing modality config
     missing_type = {"train": None, "val": None, "test": None}
-    missing_ratio = {"train": test_ratio, "val": test_ratio, "test": test_ratio}
+    missing_ratio = {"train": 0.5, "val": test_ratio, "test": test_ratio}
     both_ratio = 0.5  # missing both ratio
     missing_table_root = "./datasets/missing_tables/"
     simulate_missing = True
@@ -82,7 +80,7 @@ def config():
     weight_decay = 0.02
     decay_power = 1
     max_epoch = 5
-    warmup_steps = 100
+    warmup_steps = 0.1
     end_lr = 0
     lr_mult = 1  # multiply lr for downstream heads
 
@@ -148,7 +146,7 @@ def input_prompts():
 def none_prompts():
     prompt_type = "none"
     learnt_p = False
-    multi_layer_prompt = False
+    multi_layer_prompt = True
 
 
 ######## missing settings ########

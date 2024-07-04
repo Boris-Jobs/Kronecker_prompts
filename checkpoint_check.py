@@ -1,6 +1,6 @@
 import torch
 import sys
-output_file = "kronecker_example.log"
+output_file = "checkpoint_basic_information.log"
 
 def load_checkpoint(checkpoint_path, use_gpu=True):
     # 加载 checkpoint 文件到 GPU 或 CPU
@@ -37,7 +37,7 @@ def analyze_attention_layers(state_dict):
 
 
 def main():
-    checkpoint_path = "/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_kronecker_trainm_t_testm_t_seed0_from_vilt_200k_mlm_itm/version_1/checkpoints/last.ckpt"
+    checkpoint_path = "/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/mmimdb_input_trainm_t_testm_t_seed0_from_vilt_200k_mlm_itm/version_1/checkpoints/last.ckpt"
     checkpoint = load_checkpoint(checkpoint_path, use_gpu=True)
     print_checkpoint_structure(checkpoint)
     analyze_attention_layers(checkpoint["state_dict"])
