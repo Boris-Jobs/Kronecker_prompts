@@ -6,3 +6,6 @@ missing ratio: 1, AUROC: 50.49, Accuracy: 51.00
 missing ratio: 0, AUROC: 52.34, Accuracy: 51.10
 missing ratio: 0, AUROC: 59.74, Accuracy: 51.10
 missing ratio: 1, AUROC: 50.49, Accuracy: 51.00
+missing ratio: 0.3, AUROC: 51.85, Accuracy: 49.00
+missing ratio: 1, AUROC: 48.38, Accuracy: 49.00
+missing ratio: 0, AUROC: 52.04, Accuracy: 49.30

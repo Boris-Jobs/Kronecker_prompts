@@ -24,9 +24,9 @@ def config():
     seed = 1015
     datasets = ["coco", "vg", "sbu", "gcc"]
     loss_names = _loss_names({"itm": 1, "mlm": 1})
-    batch_size = 4096
+    batch_size = 256
 
-    test_ratio = 0
+    test_ratio = 0.5
     test_type = None
     test_exp_name = None
 
@@ -76,10 +76,10 @@ def config():
 
     # Optimizer Setting
     optim_type = "adamw"
-    learning_rate = 1e-2
+    learning_rate = 0.01
     weight_decay = 0.02
     decay_power = 1
-    max_epoch = 5
+    max_epoch = 4
     warmup_steps = 0.1
     end_lr = 0
     lr_mult = 1  # multiply lr for downstream heads
