@@ -8,11 +8,11 @@ source /scratch/project_2007023/boris/envs/missing/bin/activate
 srun -N 1 -n 1 -c 3 -t 00:15:00 --mem-per-cpu=32G --gres=gpu:a100:2 \
         -p gputest --account=project_2002243 \
         python3 run.py with \
-        data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-        task_finetune_hateful_memes \
+        data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/mmimdb/ \
+        task_finetune_mmimdb \
         input_prompts \
-        trainm_i_testm_i \
-        load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_input_trainm_i_testm_t_seed1015_from_vilt_200k_mlm_itm/version_0/checkpoints/last.ckpt \
+        trainm_t_testm_t \
+        load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/mmimdb_input_trainm_t_testm_t_seed0_from_vilt_200k_mlm_itm/version_3/checkpoints/last.ckpt \
         with_delta_infer=True \
         test_exp_name=test_only \
         test_only=True \

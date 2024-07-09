@@ -11,60 +11,30 @@ import ipdb
 class ViLTransformerSS(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
-        self.prepare_data_per_node = False  # 在 LightningModule 中设置
+        self.prepare_data_per_node = False
 
-        self.save_hyperparameters()  # The save_hyperparameters() method saves all parameters passed to the constructor as properties of the class (self.hparams).
+        self.save_hyperparameters()
 
         bert_config = BertConfig(
-            vocab_size=config["vocab_size"],  # 词汇表大小，example: 30522
-            hidden_size=config["hidden_size"],  # example: 768
-            num_hidden_layers=config["num_layers"],  # Transformer编码器数量 example: 12
-            num_attention_heads=config["num_heads"],  # 并行注意力头数量 example: 12
+            vocab_size=config["vocab_size"],
+            hidden_size=config["hidden_size"],
+            num_hidden_layers=config["num_layers"],
+            num_attention_heads=config["num_heads"],
             intermediate_size=config["hidden_size"]
-            * config["mlp_ratio"],  # example mlp_ratio = 4
+            * config["mlp_ratio"],
             max_position_embeddings=config["max_text_len"],
             hidden_dropout_prob=config["drop_rate"],
             attention_probs_dropout_prob=config["drop_rate"],
         )
-        """
-        Transformer Encoder Architecture:
 
-        LayerNorm
-            ↓
-        Multi-Head Self-Attention (MSA)
-            ├── 输入的维度: hidden_size
-            ├── 注意力头数量: num_attention_heads
-            ├── 输出的维度: hidden_size
-            ↓
-        Add & LayerNorm
-            ├── Dropout: hidden_dropout_prob
-            ↓
-        Feed-Forward Network (FFN)
-            ├── Linear1: input (hidden_size) → output (intermediate_size)
-            │   ├── intermediate_size = hidden_size * mlp_ratio
-            ├── Activation Function (e.g., ReLU or GELU)
-            ├── Linear2: input (intermediate_size) → output (hidden_size)
-            ↓
-        Add & LayerNorm
-            ├── Dropout: hidden_dropout_prob
-
-        """
-
-        # 1. prompts初始化问题，prompts的物理意义
-        # 2. missing aware prompts VS modality specific prompts
-        # 3. 不同的heads，不同的loss
-        # 4. 写文章，内容量，模块编排，Introduction、Related Work、Proposed Method、Experiments、Conclusion
-
-        # Text Embeddings and Token Type Embeddings.
         self.text_embeddings = BertEmbeddings(bert_config)
         self.text_embeddings.apply(objectives.init_weights)
 
         self.token_type_embeddings = nn.Embedding(
             2, config["hidden_size"]
-        )  # 表示有两个token类型
+        )
         self.token_type_embeddings.apply(objectives.init_weights)
 
-        # load transformer.
         if self.hparams.config["load_path"] == "":
             self.transformer = getattr(vit, self.hparams.config["vit"])(
                 pretrained=True, config=self.hparams.config
@@ -218,6 +188,7 @@ class ViLTransformerSS(pl.LightningModule):
         self.records = {}
         self.with_delta_infer = self.hparams.config["with_delta_infer"]
         print("Now, the prompt type is: ", self.prompt_type)
+        self.printed = False
 
     def infer(
         self,
@@ -475,7 +446,11 @@ class ViLTransformerSS(pl.LightningModule):
 
         return ret
 
+
     def training_step(self, batch, batch_idx):
+        if not self.printed:
+            print(batch)
+            self.printed = True
         vilt_utils.set_task(self)
 
         # Forward pass
