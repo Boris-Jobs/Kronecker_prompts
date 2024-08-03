@@ -1,125 +1,14 @@
 module load pytorch/1.12
-source /scratch/project_2007023/boris/envs/missing/bin/activate
+source /scratch/project_2003238/v/envs/missing/bin/activate
 
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
+srun -N 1 -n 1 -c 3 -t 00:15:00 --mem-per-cpu=32G --gres=gpu:a100:2 \
+     -p gputest --account=project_2003238 \
      python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
+     data_root=/scratch/project_2003238/v/missing_aware_prompts/Kronecker_prompts/datasets/hateful_memes/ \
      task_finetune_hateful_memes \
      kronecker_prompts \
      trainm_t_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_kronecker_trainm_t_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_kronecker_trainm_t_testm_t.txt
+     load_path=/scratch/project_2003238/v/missing_aware_prompts/Kronecker_prompts/vilt/vilt_200k_mlm_itm.ckpt \
+     exp_name=EDL_loss \
 
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-     task_finetune_hateful_memes \
-     input_prompts \
-     trainm_t_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_input_trainm_t_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_input_trainm_t_testm_t.txt
-
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-     task_finetune_hateful_memes \
-     none_prompts \
-     trainm_t_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_none_trainm_t_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_none_trainm_t_testm_t.txt
-
-
-
-
-
-
-
-
-
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-     task_finetune_hateful_memes \
-     kronecker_prompts \
-     trainm_i_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_kronecker_trainm_i_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_kronecker_trainm_i_testm_t.txt
-
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-     task_finetune_hateful_memes \
-     input_prompts \
-     trainm_i_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_input_trainm_i_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_input_trainm_i_testm_t.txt
-
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-     task_finetune_hateful_memes \
-     none_prompts \
-     trainm_i_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_none_trainm_i_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_none_trainm_i_testm_t.txt
-
-
-
-
-
-
-
-
-
-
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-     task_finetune_hateful_memes \
-     kronecker_prompts \
-     trainm_b_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_kronecker_trainm_b_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_kronecker_trainm_b_testm_t.txt
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-     task_finetune_hateful_memes \
-     input_prompts \
-     trainm_b_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_input_trainm_b_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_input_trainm_b_testm_t.txt
-# 训练完成
-srun -N 1 -n 1 -c 3 -t 33:33:33 --mem-per-cpu=32G --gres=gpu:a100:2 \
-     -p gpusmall --account=project_2002243 \
-     python3 run.py with \
-     data_root=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/datasets/hateful_memes/ \
-     task_finetune_hateful_memes \
-     none_prompts \
-     trainm_b_testm_t \
-     load_path=/scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/vilt/vilt_200k_mlm_itm.ckpt \
-     exp_name=hateful_memes_none_trainm_b_testm_t \
-     | tee -a /scratch/project_2007023/boris/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_none_trainm_b_testm_t.txt
+# | tee -a /scratch/project_2003238/v/missing_aware_prompts/missing_aware_prompts/result/hateful_memes_kronecker_trainm_t_testm_t.txt
